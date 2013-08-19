@@ -170,6 +170,7 @@ func (ds PostJsonDataStore) PUT(object interface{}) (response Response) {
 func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response Response) {
 
 	_slice := reflect.Indirect(reflect.ValueOf(object))
+	_type := reflect.TypeOf(object).Elem().Elem()
 
 	// --------------------------------------------------
 	// Start Timing
@@ -192,12 +193,15 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response R
 	}
 
 	for rows.Next() {
-		var contact Contact
+		_object := reflect.New(_type)
 		var data string
-		rows.Scan(&contact.Id, &data, &contact.CreatedAt, &contact.UpdatedAt)
-		json.Unmarshal([]byte(data), &contact)
+
+		// rows.Scan(&_object.Id, &data, &_object.CreatedAt, &_object.UpdatedAt)
+		rows.Scan(_object.FieldByName("Id").Pointer(), &data, _object.FieldByName("CreatedAt").Pointer(), _object.FieldByName("UpdatedAt").Pointer())
+
+		json.Unmarshal([]byte(data), &_object)
 		// spew.Dump(_slice)
-		_slice.Set(reflect.Append(_slice, reflect.ValueOf(contact)))
+		_slice.Set(reflect.Append(_slice, reflect.ValueOf(_object)))
 	}
 
 	// --------------------------------------------------
