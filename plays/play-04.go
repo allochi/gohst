@@ -2,8 +2,12 @@ package main
 
 import (
 	. "allochi/tcolor"
+	"database/sql"
 	"fmt"
+	_ "github.com/lib/pq"
+	"log"
 	"reflect"
+	"time"
 )
 
 type Person struct {
@@ -15,8 +19,23 @@ type Person struct {
 
 var tc = TColor
 
-func main() {
+func init() {
+	Contacts = PostJsonDataStore{nil, "allochi_contactizer", "allochi", ""}
+}
 
+func main() {
+	SamplePostJSon()
+}
+
+func SamplePostJSon() {
+
+	DataStore = Contacts
+	response := GET(nil, nil)
+	fmt.Println(response)
+
+}
+
+func SampleArray() {
 	allochi := Person{"Ali", "Anwar", 40, "Switzerland"}
 	vanessa := Person{"Vanessa", "-", 26, "Switzerland"}
 
@@ -25,11 +44,11 @@ func main() {
 	DataStore = People
 	fmt.Printf("Main (people b4PUT): %s\n", People)
 	response := PUT(allochi)
-	fmt.Println(response)
-	if PUT(allochi).Type == "OK" {
+	fmt.Printf("%s\n", response.Message)
+	if response.Message == "OK" {
 		fmt.Printf("$v inserted", allochi)
 	}
-	if PUT(vanessa).Type == "OK" {
+	if PUT(vanessa).Message == "OK" {
 		fmt.Printf("$v inserted", vanessa)
 	}
 	fmt.Printf("Main (people A8PUT): %s\n", People)
@@ -38,7 +57,6 @@ func main() {
 	fmt.Printf("Main (others b4PUT): %s\n", others)
 	PUT(allochi)
 	fmt.Printf("Main (others A8PUT): %s\n", others)
-
 }
 
 // --------------------------------------------------------------------------------
@@ -52,9 +70,9 @@ type DataStoreDeligate interface {
 var DataStore DataStoreDeligate
 
 type Response struct {
-	Type  string
-	Error error
-	Size  int
+	Message string
+	Error   error
+	Size    int
 }
 
 type Request struct {
@@ -63,13 +81,13 @@ type Request struct {
 }
 
 func PUT(object interface{}) Response {
-	DataStore.PUT(object)
-	return Response{}
+	log.Printf("DataStore: %v", DataStore)
+	return DataStore.PUT(object)
 }
 
 func GET(object *interface{}, query interface{}) Response {
-	DataStore.GET(object, query)
-	return Response{}
+	log.Printf("DataStore: %v", DataStore)
+	return DataStore.GET(object, query)
 }
 
 // --------------------------------------------------------------------------------
@@ -79,20 +97,18 @@ type PeopleDataStore []Person
 
 var People PeopleDataStore
 
-func (ds PeopleDataStore) PUT(object interface{}) Response {
+func (ds PeopleDataStore) PUT(object interface{}) (response Response) {
 	_object := reflect.ValueOf(object)
 	_people := reflect.Indirect(reflect.ValueOf(&People))
 	_people.Set(reflect.Append(_people, _object))
 
-	response := Response{}
-	response.Type = "asjdhalhdlas"
+	response.Message = "Ok"
 	response.Error = nil
-	response.Size = 100
-	fmt.Println(response)
-	return response
+	response.Size = 0
+	return
 }
 
-func (ds PeopleDataStore) GET(*interface{}, interface{}) Response {
+func (ds PeopleDataStore) GET(*interface{}, interface{}) (response Response) {
 	return Response{}
 }
 
@@ -100,13 +116,74 @@ type OthersDataStore []Person
 
 var others OthersDataStore
 
-func (ds OthersDataStore) PUT(object interface{}) Response {
+func (ds OthersDataStore) PUT(object interface{}) (response Response) {
 	_object := reflect.ValueOf(object)
 	_others := reflect.Indirect(reflect.ValueOf(&others))
 	_others.Set(reflect.Append(_others, _object))
+
+	response.Message = "Ok"
+	response.Error = nil
+	response.Size = 0
+	return
+}
+
+func (ds OthersDataStore) GET(*interface{}, interface{}) (response Response) {
 	return Response{}
 }
 
-func (ds OthersDataStore) GET(*interface{}, interface{}) Response {
+// --------------------------------------------------------------------------------
+// PostJSON Data Stores
+// --------------------------------------------------------------------------------
+type PostJsonDataStore struct {
+	Database     *sql.DB
+	DatabaseName string
+	User         string
+	Password     string
+}
+
+var Contacts PostJsonDataStore
+
+func (ds PostJsonDataStore) Init() {
+	log.Println("Initializing Database Connection...")
+
+	ds.Database, _ = sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
+	// defer ds.Database.Close()
+
+	if err := ds.Database.Ping(); err != nil {
+		log.Fatalf("Couldn't connect to the database: %s", err)
+	}
+}
+
+func (ds PostJsonDataStore) PUT(object interface{}) (response Response) {
+
+	// TODO: Need insert logic here
+
+	response.Message = "Ok"
+	response.Error = nil
+	response.Size = 0
+	return
+}
+
+func (ds PostJsonDataStore) GET(object *interface{}, ids interface{}) (response Response) {
+
+	ds.Database.Query("select * from json_contacts limit $1;", 10)
+	// rows, err := ds.Database.Query("select * from json_contacts limit $1;", 10)
+	// if err != nil {
+	// 	log.Fatalf("Couldn't select table information: %s", err)
+	// }
+
+	// fmt.Printf("rows: %v\n", rows)
+
+	response.Message = "Ok"
+	response.Error = nil
+	response.Size = 0
 	return Response{}
+}
+
+type Contact struct {
+	Id        int64
+	FirstName string
+	LastName  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
