@@ -172,11 +172,6 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response R
 	_slice := reflect.Indirect(reflect.ValueOf(object))
 	_type := reflect.TypeOf(object).Elem().Elem()
 
-	// --------------------------------------------------
-	// Start Timing
-	// --------------------------------------------------
-	startTime := time.Now()
-
 	db, _ := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
 	defer db.Close()
 
@@ -193,27 +188,29 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response R
 	}
 
 	for rows.Next() {
+		var record Record
 		_object := reflect.New(_type)
-		var data string
 
-		// rows.Scan(&_object.Id, &data, &_object.CreatedAt, &_object.UpdatedAt)
-		rows.Scan(_object.FieldByName("Id").Pointer(), &data, _object.FieldByName("CreatedAt").Pointer(), _object.FieldByName("UpdatedAt").Pointer())
+		rows.Scan(&record.Id, &record.Data, &record.CreatedAt, &record.UpdatedAt)
 
-		json.Unmarshal([]byte(data), &_object)
-		// spew.Dump(_slice)
-		_slice.Set(reflect.Append(_slice, reflect.ValueOf(_object)))
+		_object.Elem().FieldByName("Id").SetInt(record.Id)
+		_object.Elem().FieldByName("CreatedAt").Set(reflect.ValueOf(record.CreatedAt))
+		_object.Elem().FieldByName("UpdatedAt").Set(reflect.ValueOf(record.UpdatedAt))
+		json.Unmarshal(record.Data, _object.Interface())
+		_slice.Set(reflect.Append(_slice, _object.Elem()))
 	}
-
-	// --------------------------------------------------
-	// Stop Timing
-	// --------------------------------------------------
-	duration := time.Since(startTime)
-	fmt.Printf("%v ms\n", duration.Seconds()*1000)
 
 	response.Message = "Ok"
 	response.Error = nil
 	response.Size = 0
 	return Response{}
+}
+
+type Record struct {
+	Id        int64
+	Data      []byte
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Contact struct {
