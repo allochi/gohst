@@ -27,7 +27,7 @@ func SamplePostJSon() {
 	var contacts []Contact
 	gohst.GET(&contacts, nil)
 	for _, contact := range contacts {
-		fmt.Println(contact.Name())
+		fmt.Printf("%28s %-18s %-24s\n", contact.Name(), contact.Country, contact.Fax)
 	}
 
 }
