@@ -45,7 +45,7 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response R
 	}
 
 	// TODO: Generalize Query
-	rows, err := db.Query(`select "id","data","created_at","updated_at" from json_contacts order by "id" limit $1;`, 10)
+	rows, err := db.Query(`select "id","data","created_at","updated_at" from json_contacts order by "id" limit $1;`, 1000)
 	defer rows.Close()
 
 	if err != nil {
