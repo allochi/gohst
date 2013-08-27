@@ -4,9 +4,12 @@ import (
 	"allochi/inflect"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	_ "github.com/lib/pq"
 	"log"
 	"reflect"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -35,8 +38,6 @@ func (ds PostJsonDataStore) PUT(object interface{}) (response Response) {
 
 func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response Response) {
 
-	recordIDs := ids.([]int64)
-
 	_slice := reflect.Indirect(reflect.ValueOf(object))
 	_type := reflect.TypeOf(object).Elem().Elem()
 
@@ -51,8 +52,18 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response R
 	}
 
 	// TODO: Generalize Query
-	sqlStatement := `select "id","data","created_at","updated_at" from json_` + tableName + ` where id in $1`
-	rows, err := db.Query(sqlStatement, recordIDs)
+	var sqlStatement string
+	if ids != nil {
+		_ids := ids.([]int64)
+		_idsStr := make([]string, len(_ids))
+		for i, id := range _ids {
+			_idsStr[i] = strconv.FormatInt(id, 10)
+		}
+		sqlStatement = fmt.Sprintf("select * from json_%s where id in (%s);", tableName, strings.Join(_idsStr, ","))
+	} else {
+		sqlStatement = fmt.Sprintf("select * from json_%s;", tableName)
+	}
+	rows, err := db.Query(sqlStatement)
 	defer rows.Close()
 
 	if err != nil {

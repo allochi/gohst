@@ -20,28 +20,43 @@ func init() {
 }
 
 func main() {
-	MailingListsList()
+	// MailingListsList()
 	// SamplePostJSon()
+	ContactsOfMailingList()
 }
 
 var Contacts gohst.PostJsonDataStore
 var MailingLists gohst.PostJsonDataStore
 
+func ContactsOfMailingList() {
+
+	// Get the mailing list
+	var mailingLists []MailingList
+	gohst.GET("MailingLists", &mailingLists, []int64{14})
+
+	// Get the contacts
+	var contacts []Contact
+	gohst.GET("Contacts", &contacts, mailingLists[0].ContactIds)
+
+	for _, contact := range contacts {
+		InterestOfContact(contact)
+	}
+
+}
+
 func MailingListsList() {
-	// gohst.DataStore = MailingLists
 	var mailingLists []MailingList
 	recordIDs := []int64{1, 2, 3}
 	gohst.GET("MailingLists", &mailingLists, recordIDs)
 	for _, mailingList := range mailingLists {
 		fmt.Printf("> %s (%d)\n", mailingList.Name, len(mailingList.ContactIds))
-		// spew.Dump(mailingList)
 	}
 }
 
 func SamplePostJSon() {
 
 	var contacts []Contact
-	gohst.GET("Contacts", &contacts, nil)
+	gohst.GET("Contacts", &contacts, []int64{1, 2, 3, 4})
 	for _, contact := range contacts {
 		InterestOfContact(contact)
 	}
