@@ -25,6 +25,9 @@ type Contact struct {
 	Department     string    `json:"department"`
 	Role           string    `json:"role"`
 	Comments       string    `json:"comments"`
+	Categories     []string  `json:"categories"`
+	Sectors        []string  `json:"sectors"`
+	Interests      []string  `json:"interests"`
 	CreatedAt      time.Time `json:"-"`
 	UpdatedAt      time.Time `json:"-"`
 }

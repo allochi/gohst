@@ -1,100 +1,144 @@
 package main
 
 import (
+	"allochi/gohst"
+	. "allochi/gohst/plays/models"
 	. "allochi/tcolor"
 	"fmt"
 	// "github.com/davecgh/go-spew/spew"
-	"allochi/gohst"
-	. "allochi/gohst/plays/models"
-	"reflect"
+	// "reflect"
+	"strings"
 )
 
 var tc = TColor
 
 func init() {
 	Contacts = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
+	MailingLists = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
+	gohst.Register("Contacts", Contacts)
+	gohst.Register("MailingLists", MailingLists)
 }
 
 func main() {
-	SamplePostJSon()
+	MailingListsList()
+	// SamplePostJSon()
 }
 
 var Contacts gohst.PostJsonDataStore
+var MailingLists gohst.PostJsonDataStore
+
+func MailingListsList() {
+	// gohst.DataStore = MailingLists
+	var mailingLists []MailingList
+	recordIDs := []int64{1, 2, 3}
+	gohst.GET("MailingLists", &mailingLists, recordIDs)
+	for _, mailingList := range mailingLists {
+		fmt.Printf("> %s (%d)\n", mailingList.Name, len(mailingList.ContactIds))
+		// spew.Dump(mailingList)
+	}
+}
 
 func SamplePostJSon() {
 
-	gohst.DataStore = Contacts
 	var contacts []Contact
-	gohst.GET(&contacts, nil)
+	gohst.GET("Contacts", &contacts, nil)
 	for _, contact := range contacts {
-		if contact.IsOrganization {
-			fmt.Printf("> %s\n %-18s %-24s\n\n", contact.Name(), contact.Country, contact.City)
-		}
+		InterestOfContact(contact)
 	}
 
 }
 
-func SampleArray() {
-	allochi := Person{"Ali", "Anwar", 40, "Switzerland"}
-	vanessa := Person{"Vanessa", "-", 26, "Switzerland"}
+// func organizations(contact Contact) {
+// 	if contact.IsOrganization {
+// 		fmt.Printf("> %s\n %-18s %-24s\n\n", contact.Name(), contact.Country, contact.City)
+// 	}
+// }
 
-	// people = append(people, vanessa)
+// func categorizedContact(contact Contact) {
+// 	if len(contact.Categories) > 0 {
+// 		fmt.Printf("%-64s [ %s ]\n", contact.Name(), strings.Join(contact.Categories, " | "))
+// 	} else {
+// 		fmt.Printf("%s\n", contact.Name())
+// 	}
+// }
 
-	gohst.DataStore = People
-	fmt.Printf("Main (people b4PUT): %s\n", People)
-	response := gohst.PUT(allochi)
-	fmt.Printf("%s\n", response.Message)
-	if response.Message == "OK" {
-		fmt.Printf("$v inserted", allochi)
+// func sectoredContact(contact Contact) {
+// 	if len(contact.Sectors) > 0 {
+// 		fmt.Printf("%-64s [ %s ]\n", contact.Name(), strings.Join(contact.Sectors, " | "))
+// 	} else {
+// 		fmt.Printf("%s\n", contact.Name())
+// 	}
+// }
+
+func InterestOfContact(contact Contact) {
+	if len(contact.Interests) > 0 {
+		fmt.Printf("%-64s [ %s ]\n", contact.Name(), strings.Join(contact.Interests, " | "))
+	} else {
+		fmt.Printf("%s\n", contact.Name())
 	}
-	if gohst.PUT(vanessa).Message == "OK" {
-		fmt.Printf("$v inserted", vanessa)
-	}
-	fmt.Printf("Main (people A8PUT): %s\n", People)
-
-	gohst.DataStore = others
-	fmt.Printf("Main (others b4PUT): %s\n", others)
-	gohst.PUT(allochi)
-	fmt.Printf("Main (others A8PUT): %s\n", others)
 }
 
-// --------------------------------------------------------------------------------
-// Array Data Stores
-// --------------------------------------------------------------------------------
-type PeopleDataStore []Person
+// func SampleArray() {
+// 	allochi := Person{"Ali", "Anwar", 40, "Switzerland"}
+// 	vanessa := Person{"Vanessa", "-", 26, "Switzerland"}
 
-var People PeopleDataStore
+// 	// people = append(people, vanessa)
 
-func (ds PeopleDataStore) PUT(object interface{}) (response gohst.Response) {
-	_object := reflect.ValueOf(object)
-	_people := reflect.Indirect(reflect.ValueOf(&People))
-	_people.Set(reflect.Append(_people, _object))
+// 	gohst.DataStore = People
+// 	fmt.Printf("Main (people b4PUT): %s\n", People)
+// 	response := gohst.PUT(allochi)
+// 	fmt.Printf("%s\n", response.Message)
+// 	if response.Message == "OK" {
+// 		fmt.Printf("$v inserted", allochi)
+// 	}
+// 	if gohst.PUT(vanessa).Message == "OK" {
+// 		fmt.Printf("$v inserted", vanessa)
+// 	}
+// 	fmt.Printf("Main (people A8PUT): %s\n", People)
 
-	response.Message = "Ok"
-	response.Error = nil
-	response.Size = 0
-	return
-}
+// 	gohst.DataStore = others
+// 	fmt.Printf("Main (others b4PUT): %s\n", others)
+// 	gohst.PUT(allochi)
+// 	fmt.Printf("Main (others A8PUT): %s\n", others)
+// }
 
-func (ds PeopleDataStore) GET(interface{}, interface{}) (response gohst.Response) {
-	return
-}
+// // --------------------------------------------------------------------------------
+// // Array Data Stores
+// // --------------------------------------------------------------------------------
+// type PeopleDataStore []Person
 
-type OthersDataStore []Person
+// var People PeopleDataStore
 
-var others OthersDataStore
+// func (ds PeopleDataStore) PUT(object interface{}) (response gohst.Response) {
+// 	_object := reflect.ValueOf(object)
+// 	_people := reflect.Indirect(reflect.ValueOf(&People))
+// 	_people.Set(reflect.Append(_people, _object))
 
-func (ds OthersDataStore) PUT(object interface{}) (response gohst.Response) {
-	_object := reflect.ValueOf(object)
-	_others := reflect.Indirect(reflect.ValueOf(&others))
-	_others.Set(reflect.Append(_others, _object))
+// 	response.Message = "Ok"
+// 	response.Error = nil
+// 	response.Size = 0
+// 	return
+// }
 
-	response.Message = "Ok"
-	response.Error = nil
-	response.Size = 0
-	return
-}
+// func (ds PeopleDataStore) GET(interface{}, interface{}) (response gohst.Response) {
+// 	return
+// }
 
-func (ds OthersDataStore) GET(interface{}, interface{}) (response gohst.Response) {
-	return
-}
+// type OthersDataStore []Person
+
+// var others OthersDataStore
+
+// func (ds OthersDataStore) PUT(object interface{}) (response gohst.Response) {
+// 	_object := reflect.ValueOf(object)
+// 	_others := reflect.Indirect(reflect.ValueOf(&others))
+// 	_others.Set(reflect.Append(_others, _object))
+
+// 	response.Message = "Ok"
+// 	response.Error = nil
+// 	response.Size = 0
+// 	return
+// }
+
+// func (ds OthersDataStore) GET(interface{}, interface{}) (response gohst.Response) {
+// 	return
+// }

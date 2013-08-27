@@ -1,6 +1,7 @@
 package gohst
 
 import (
+	"allochi/inflect"
 	"database/sql"
 	"encoding/json"
 	_ "github.com/lib/pq"
@@ -34,8 +35,13 @@ func (ds PostJsonDataStore) PUT(object interface{}) (response Response) {
 
 func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response Response) {
 
+	recordIDs := ids.([]int64)
+
 	_slice := reflect.Indirect(reflect.ValueOf(object))
 	_type := reflect.TypeOf(object).Elem().Elem()
+
+	_typeName := _type.Name()
+	tableName := inflect.Pluralize(inflect.Underscore(_typeName))
 
 	db, _ := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
 	defer db.Close()
@@ -45,7 +51,8 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response R
 	}
 
 	// TODO: Generalize Query
-	rows, err := db.Query(`select "id","data","created_at","updated_at" from json_contacts order by "id" limit $1;`, 1000)
+	sqlStatement := `select "id","data","created_at","updated_at" from json_` + tableName + ` where id in $1`
+	rows, err := db.Query(sqlStatement, recordIDs)
 	defer rows.Close()
 
 	if err != nil {

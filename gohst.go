@@ -1,8 +1,15 @@
 package gohst
 
-var DataStore DataStoreDeligate
+import "errors"
 
-type DataStoreDeligate interface {
+// var DataStore DataStoreDeligate
+var datastores map[string]DataStore
+
+func init() {
+	datastores = make(map[string]DataStore)
+}
+
+type DataStore interface {
 	PUT(interface{}) Response
 	GET(interface{}, interface{}) Response
 }
@@ -18,10 +25,27 @@ type Request struct {
 	Source string
 }
 
-func PUT(object interface{}) Response {
-	return DataStore.PUT(object)
+func Register(name string, datastore DataStore) error {
+	if name == "" {
+		return errors.New("Can't have empty data store name")
+	}
+
+	if datastore == nil {
+		return errors.New("Can't have empty data store")
+	}
+
+	if datastores[name] != nil {
+		return errors.New("Can't reassign data store name")
+	}
+
+	datastores[name] = datastore
+	return nil
 }
 
-func GET(object interface{}, query interface{}) Response {
-	return DataStore.GET(object, query)
+func PUT(name string, object interface{}) Response {
+	return datastores[name].PUT(object)
+}
+
+func GET(name string, object interface{}, query interface{}) Response {
+	return datastores[name].GET(object, query)
 }
