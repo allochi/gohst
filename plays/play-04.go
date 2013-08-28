@@ -22,11 +22,28 @@ func init() {
 func main() {
 	// MailingListsList()
 	// SamplePostJSon()
-	ContactsOfMailingList()
+	// ContactsOfMailingList()
+	InsertAContact()
 }
 
 var Contacts gohst.PostJsonDataStore
 var MailingLists gohst.PostJsonDataStore
+
+func InsertAContact() {
+
+	var contact Contact
+	contact.FirstName = "Allochi"
+	contact.LastName = "AlMuwali"
+	gohst.PUT("Contacts", contact)
+}
+
+func UpdateAContact() {
+	var contacts []Contact
+	gohst.GET("Contacts", &contacts, []int64{1})
+	contact := contacts[0]
+	// spew.Dump(contact)
+	gohst.PUT("Contacts", contact)
+}
 
 func ContactsOfMailingList() {
 
@@ -41,6 +58,8 @@ func ContactsOfMailingList() {
 	for _, contact := range contacts {
 		InterestOfContact(contact)
 	}
+
+	fmt.Println(len(contacts), " contacts were retrieved")
 
 }
 

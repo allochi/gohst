@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	// "github.com/davecgh/go-spew/spew"
 	_ "github.com/lib/pq"
 	"log"
 	"reflect"
@@ -28,7 +29,43 @@ type Record struct {
 
 func (ds PostJsonDataStore) PUT(object interface{}) (response Response) {
 
-	// TODO: Need insert logic here
+	record := Record{}
+	// isNew := true
+
+	_elem := reflect.ValueOf(object)
+	record.Id = _elem.FieldByName("Id").Int()
+	data, err := json.Marshal(object)
+	if err != nil {
+		log.Printf("JSON Error: %s\n", err)
+		return
+	}
+	record.Data = data
+	record.CreatedAt = _elem.FieldByName("CreatedAt").Interface().(time.Time)
+	record.UpdatedAt = _elem.FieldByName("UpdatedAt").Interface().(time.Time)
+
+	_type := reflect.TypeOf(object)
+	_typeName := _type.Name()
+	tableName := inflect.Pluralize(inflect.Underscore(_typeName))
+
+	// Transaction?
+	// is it insert or update?
+	var sqlStatement string
+	if record.Id == 0 {
+		sqlStatement = fmt.Sprintf("INSERT INTO json_%s (data, created_at, updated_at) VALUES ('%s',NOW(),NOW())", tableName, record.Data)
+	} else {
+		sqlStatement = fmt.Sprintf("UPDATE json_%s SET data='%s', updated_at=NOW() WHERE id = %d", tableName, record.Data, record.Id)
+	}
+
+	log.Printf("%s \n", sqlStatement)
+
+	db, _ := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
+	defer db.Close()
+
+	_, err = db.Exec(sqlStatement)
+
+	if err != nil {
+		log.Fatalf("PUT - Database error: %s\n", err)
+	}
 
 	response.Message = "Ok"
 	response.Error = nil
