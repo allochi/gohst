@@ -5,9 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	// "github.com/davecgh/go-spew/spew"
 	_ "github.com/lib/pq"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -27,17 +25,18 @@ type Record struct {
 	UpdatedAt time.Time
 }
 
-func (ds PostJsonDataStore) PUT(object interface{}) (response Response) {
+func (ds PostJsonDataStore) PUT(object interface{}) error {
 
 	record := Record{}
-	// isNew := true
 
 	_elem := reflect.ValueOf(object)
+
+	// ID is a Sequence of integers, Not sure about other ID types
 	record.Id = _elem.FieldByName("Id").Int()
+
 	data, err := json.Marshal(object)
 	if err != nil {
-		log.Printf("JSON Error: %s\n", err)
-		return
+		return err
 	}
 	record.Data = data
 	record.CreatedAt = _elem.FieldByName("CreatedAt").Interface().(time.Time)
@@ -51,29 +50,27 @@ func (ds PostJsonDataStore) PUT(object interface{}) (response Response) {
 	// is it insert or update?
 	var sqlStatement string
 	if record.Id == 0 {
+		// TODO: If the store is not there
 		sqlStatement = fmt.Sprintf("INSERT INTO json_%s (data, created_at, updated_at) VALUES ('%s',NOW(),NOW())", tableName, record.Data)
 	} else {
 		sqlStatement = fmt.Sprintf("UPDATE json_%s SET data='%s', updated_at=NOW() WHERE id = %d", tableName, record.Data, record.Id)
 	}
 
-	log.Printf("%s \n", sqlStatement)
-
-	db, _ := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
+	db, err := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
+	if err != nil {
+		return err
+	}
 	defer db.Close()
 
 	_, err = db.Exec(sqlStatement)
-
 	if err != nil {
-		log.Fatalf("PUT - Database error: %s\n", err)
+		return err
 	}
 
-	response.Message = "Ok"
-	response.Error = nil
-	response.Size = 0
-	return
+	return nil
 }
 
-func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response Response) {
+func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) error {
 
 	_slice := reflect.Indirect(reflect.ValueOf(object))
 	_type := reflect.TypeOf(object).Elem().Elem()
@@ -81,14 +78,12 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response R
 	_typeName := _type.Name()
 	tableName := inflect.Pluralize(inflect.Underscore(_typeName))
 
-	db, _ := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
+	db, err := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
+	if err != nil {
+		return err
+	}
 	defer db.Close()
 
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Couldn't connect to the database: %s", err)
-	}
-
-	// TODO: Generalize Query
 	var sqlStatement string
 	if ids != nil {
 		_ids := ids.([]int64)
@@ -101,11 +96,10 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response R
 		sqlStatement = fmt.Sprintf("select * from json_%s;", tableName)
 	}
 	rows, err := db.Query(sqlStatement)
-	defer rows.Close()
-
 	if err != nil {
-		log.Fatalf("Couldn't select table information: %s", err)
+		return err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var record Record
@@ -120,8 +114,5 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (response R
 		_slice.Set(reflect.Append(_slice, _object.Elem()))
 	}
 
-	response.Message = "Ok"
-	response.Error = nil
-	response.Size = 0
-	return Response{}
+	return nil
 }

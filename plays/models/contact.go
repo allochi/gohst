@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+// I could have included the record of PostJSON in Contact
+// This will make Contact include the "Data" string
+// For other data stores this is a dead wight dragged with each object
+// In case of a memory data store this is inefficient and expensive
+
 type Contact struct {
 	Id             int64     `json:"-"`
 	FirstName      string    `json:"first_name"`

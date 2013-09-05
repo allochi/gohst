@@ -13,60 +13,62 @@ import (
 var tc = TColor
 
 func init() {
-	Contacts = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
-	MailingLists = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
-	gohst.Register("Contacts", Contacts)
-	gohst.Register("MailingLists", MailingLists)
+	Contactizer = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
+	gohst.Register("Contactizer", Contactizer)
 }
 
 func main() {
 	// MailingListsList()
 	// SamplePostJSon()
-	// ContactsOfMailingList()
-	InsertAContact()
+	ContactsOfMailingList()
+	// InsertAContact()
 }
 
-var Contacts gohst.PostJsonDataStore
-var MailingLists gohst.PostJsonDataStore
+var Contactizer gohst.PostJsonDataStore
 
 func InsertAContact() {
 
 	var contact Contact
 	contact.FirstName = "Allochi"
 	contact.LastName = "AlMuwali"
-	gohst.PUT("Contacts", contact)
+	gohst.PUT("Contactizer", contact)
 }
 
 func UpdateAContact() {
 	var contacts []Contact
-	gohst.GET("Contacts", &contacts, []int64{1})
+	gohst.GET("Contactizer", &contacts, []int64{1})
 	contact := contacts[0]
 	// spew.Dump(contact)
-	gohst.PUT("Contacts", contact)
+	gohst.PUT("Contactizer", contact)
 }
 
 func ContactsOfMailingList() {
 
 	// Get the mailing list
 	var mailingLists []MailingList
-	gohst.GET("MailingLists", &mailingLists, []int64{14})
+	err := gohst.GET("Contactizer", &mailingLists, []int64{14})
 
-	// Get the contacts
-	var contacts []Contact
-	gohst.GET("Contacts", &contacts, mailingLists[0].ContactIds)
-
-	for _, contact := range contacts {
-		InterestOfContact(contact)
+	if err != nil {
+		fmt.Printf("Error getting mailing list: %s", err)
 	}
 
-	fmt.Println(len(contacts), " contacts were retrieved")
+	// Get the contacts
+	// var contacts []Contact
+	// gohst.GET("Contactizer", &contacts, mailingLists[0].ContactIds)
+
+	// for _, contact := range contacts {
+	// 	InterestOfContact(contact)
+	// }
+
+	fmt.Println(len(mailingLists), " mailingLists were retrieved")
+	// fmt.Println(len(contacts), " contacts were retrieved")
 
 }
 
 func MailingListsList() {
 	var mailingLists []MailingList
 	recordIDs := []int64{1, 2, 3}
-	gohst.GET("MailingLists", &mailingLists, recordIDs)
+	gohst.GET("Contactizer", &mailingLists, recordIDs)
 	for _, mailingList := range mailingLists {
 		fmt.Printf("> %s (%d)\n", mailingList.Name, len(mailingList.ContactIds))
 	}
@@ -75,7 +77,7 @@ func MailingListsList() {
 func SamplePostJSon() {
 
 	var contacts []Contact
-	gohst.GET("Contacts", &contacts, []int64{1, 2, 3, 4})
+	gohst.GET("Contactizer", &contacts, []int64{1, 2, 3, 4})
 	for _, contact := range contacts {
 		InterestOfContact(contact)
 	}
