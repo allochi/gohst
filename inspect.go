@@ -4,61 +4,59 @@ import (
 	"reflect"
 )
 
-func IsPtr2Slice(i interface{}) bool {
-	_value := reflect.ValueOf(i)
-	return (_value.Type().Kind() == reflect.Ptr) && (_value.Elem().Type().Kind() == reflect.Slice)
-}
+type Kind uint
 
-func IsPtr2Struct(i interface{}) bool {
-	_value := reflect.ValueOf(i)
-	return (_value.Type().Kind() == reflect.Ptr) && (_value.Elem().Type().Kind() == reflect.Struct)
-}
+// Pointer are odds
+const (
+	Nil Kind = iota
+	Pointer
+	Struct
+	Pointer2Struct
+	Slice
+	Pointer2Slice
+	SliceOfPrimitive
+	Pointer2SliceOfPrimitive
+	SliceOfStruct
+	Pointer2SliceOfStruct
+)
 
-func IsStructOrPtr2Struct(i interface{}) bool {
+func KindOf(i interface{}) (kind Kind) {
 	_value := reflect.ValueOf(i)
-	return (_value.Type().Kind() == reflect.Struct) || ((_value.Type().Kind() == reflect.Ptr) && (_value.Elem().Type().Kind() == reflect.Struct))
-}
 
-func IsPtr2SliceOfStruct(i interface{}) (result bool) {
-	_value := reflect.ValueOf(i)
+	// Is it nil?
+	if _value.Kind() == reflect.Invalid {
+		return
+	}
+
+	// Is it a pointer?
+	var _type reflect.Type
 	if _value.Type().Kind() == reflect.Ptr {
-		_elemType := _value.Elem().Type()
-		if (_elemType.Kind() == reflect.Slice) && (_elemType.Elem().Kind() == reflect.Struct) {
-			result = true
+		_type = _value.Elem().Type()
+		kind += Pointer
+	} else {
+		_type = _value.Type()
+	}
+
+	// Is it a slice or a struct?
+	_kind := _type.Kind()
+	var _elemKind reflect.Kind
+	if _kind == reflect.Slice {
+		_elemKind = _type.Elem().Kind()
+		kind += Slice
+	} else if _kind == reflect.Struct {
+		kind += Struct
+	}
+
+	// Is it a slice of struct or primitives
+	if (_elemKind > reflect.Invalid) && (_elemKind < reflect.Array || _elemKind == reflect.String) {
+		if kind == Slice || kind == Pointer2Slice {
+			kind += 2
+		}
+	} else if _elemKind == reflect.Struct {
+		if kind == Slice || kind == Pointer2Slice {
+			kind += 4
 		}
 	}
-	return
-}
 
-func IsPtr2SliceOfPrimitive(i interface{}) (result bool) {
-	_value := reflect.ValueOf(i)
-	if _value.Type().Kind() == reflect.Ptr {
-		_elem := _value.Elem()
-		if _elem.Type().Kind() == reflect.Slice {
-			_elemKind := _value.Elem().Type().Elem().Kind()
-			if (_elemKind > reflect.Invalid) && (_elemKind < reflect.Array || _elemKind == reflect.String) {
-				result = true
-			}
-		}
-	}
-	return
-}
-
-func IsSliceOrPtr2SliceOfPrimitive(i interface{}) (result bool) {
-	_value := reflect.ValueOf(i)
-	if _value.Type().Kind() == reflect.Ptr {
-		_elem := _value.Elem()
-		if _elem.Type().Kind() == reflect.Slice {
-			_elemKind := _value.Elem().Type().Elem().Kind()
-			if (_elemKind > reflect.Invalid) && (_elemKind < reflect.Array || _elemKind == reflect.String) {
-				result = true
-			}
-		}
-	} else if _value.Type().Kind() == reflect.Slice {
-		_elemKind := _value.Type().Elem().Kind()
-		if (_elemKind > reflect.Invalid) && (_elemKind < reflect.Array || _elemKind == reflect.String) {
-			result = true
-		}
-	}
 	return
 }

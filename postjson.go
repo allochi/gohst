@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "github.com/lib/pq"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -96,7 +95,6 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) error {
 	} else {
 		sqlStatement = fmt.Sprintf("select * from json_%s;", tableName)
 	}
-	log.Println(sqlStatement)
 	rows, err := db.Query(sqlStatement)
 	if err != nil {
 		return err

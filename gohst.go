@@ -1,7 +1,6 @@
 package gohst
 
 import "errors"
-import "fmt"
 
 // var DataStore DataStoreDeligate
 var datastores map[string]DataStore
@@ -33,21 +32,23 @@ func Register(name string, datastore DataStore) error {
 }
 
 func PUT(name string, object interface{}) error {
-	if !IsStructOrPtr2Struct(object) {
+	_kind := KindOf(object)
+	if _kind != Struct || _kind != Pointer2Struct {
 		return errors.New("PUT only accepts an object or a pointer to an object of type struct")
 	}
 	return datastores[name].PUT(object)
 }
 
 func GET(name string, object interface{}, ids interface{}) error {
-	fmt.Println("Testing array")
-	if !IsPtr2SliceOfStruct(object) {
+	_objectKind := KindOf(object)
+	if _objectKind != Pointer2SliceOfStruct {
 		return errors.New("GET accepts a pointer to slice of a struct type as an object")
 	}
-	fmt.Println("Testing ids")
-	if ids != nil && !IsSliceOrPtr2SliceOfPrimitive(ids) {
+
+	_idsKind := KindOf(ids)
+	if _idsKind != SliceOfPrimitive {
 		return errors.New("GET accepts pointer to slice of a primitive type as ids e.g int64 or string")
 	}
-	fmt.Println("Calling Real GET")
+
 	return datastores[name].GET(object, ids)
 }

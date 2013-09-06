@@ -14,21 +14,31 @@ func main() {
 	// test()
 
 	person := Person{"Allochi"}
-	fmt.Println(IsStructOrPtr2Struct(person))
-	fmt.Println(IsStructOrPtr2Struct(&person))
+	fmt.Println("KindOf(person) == Struct: ", KindOf(person) == Struct)
+	fmt.Println("KindOf(&person) == Pointer2Struct: ", KindOf(&person) == Pointer2Struct)
+	fmt.Println("KindOf(person) == Pointer2Struct: ", KindOf(person) == Pointer2Struct)
 
 	var something []uint64
-	fmt.Println(IsPtr2SliceOfPrimitive(&something))
+	// fmt.Println(IsPtr2SliceOfPrimitive(&something))
+	fmt.Println("KindOf(&something) == Pointer2SliceOfPrimitive: ", KindOf(&something) == Pointer2SliceOfPrimitive)
+	// fmt.Println("KindOf(&something) == Pointer2SliceOfPrimitive: ", KindOf(&something))
 
 	var people []Person
-	fmt.Println(IsPtr2SliceOfStruct(people))
-	fmt.Println(IsPtr2SliceOfStruct(&people))
+	// fmt.Println(IsPtr2SliceOfStruct(people))
+	fmt.Println("KindOf(people) == Pointer2SliceOfStruct: ", KindOf(people) == Pointer2SliceOfStruct)
+	fmt.Println("KindOf(people) == SliceOfStruct: ", KindOf(people) == SliceOfStruct)
+	// fmt.Println(IsPtr2SliceOfStruct(&people))
+	fmt.Println("KindOf(&people) == Pointer2SliceOfStruct: ", KindOf(&people) == Pointer2SliceOfStruct)
 
-	fmt.Println(IsPtr2SliceOfStruct(Person{}))
-	fmt.Println(IsPtr2SliceOfStruct(&Person{}))
+	// fmt.Println(IsPtr2SliceOfStruct(Person{}))
+	fmt.Println("KindOf(Person{}) == Pointer2SliceOfStruct: ", KindOf(Person{}) == Pointer2SliceOfStruct)
+	// fmt.Println(IsPtr2SliceOfStruct(&Person{}))
+	fmt.Println("KindOf(&Person{}) == Pointer2SliceOfStruct: ", KindOf(&Person{}) == Pointer2SliceOfStruct)
 
-	fmt.Println(IsStructOrPtr2Struct(people))
-	fmt.Println(IsStructOrPtr2Struct(&people))
+	// fmt.Println(IsStructOrPtr2Struct(people))
+	fmt.Println("KindOf(people) == Struct || KindOf(people) == Pointer2Struct: ", KindOf(people) == Struct || KindOf(people) == Pointer2Struct)
+	// fmt.Println(IsStructOrPtr2Struct(&people))
+	fmt.Println("KindOf(&people) == Struct || KindOf(&people) == Pointer2Struct: ", KindOf(&people) == Struct || KindOf(&people) == Pointer2Struct)
 
 }
 
@@ -53,22 +63,22 @@ func test() {
 
 	var i int64
 
-	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "&Person{}", IsPtr2Slice(&Person{}))
-	fmt.Printf("Is %12s a pointer to struct? %8t \n", "&Person{}", IsPtr2Struct(&Person{}))
+	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "&Person{}", KindOf(&Person{}) == Pointer2Slice)
+	fmt.Printf("Is %12s a pointer to struct? %8t \n", "&Person{}", KindOf(&Person{}) == Pointer2Struct)
 
-	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "&[]string{}", IsPtr2Slice(&[]string{}))
-	fmt.Printf("Is %12s a pointer to struct? %8t \n", "&[]string{}", IsPtr2Struct(&[]string{}))
+	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "&[]string{}", KindOf(&[]string{}) == Pointer2Slice)
+	fmt.Printf("Is %12s a pointer to struct? %8t \n", "&[]string{}", KindOf(&[]string{}) == Pointer2Struct)
 
-	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "&i", IsPtr2Slice(&i))
-	fmt.Printf("Is %12s a pointer to struct? %8t \n", "&i", IsPtr2Struct(&i))
+	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "&i", KindOf(&i) == Pointer2Slice)
+	fmt.Printf("Is %12s a pointer to struct? %8t \n", "&i", KindOf(&i) == Pointer2Struct)
 
-	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "Person{}", IsPtr2Slice(Person{}))
-	fmt.Printf("Is %12s a pointer to struct? %8t \n", "Person{}", IsPtr2Struct(Person{}))
+	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "Person{}", KindOf(Person{}) == Pointer2Slice)
+	fmt.Printf("Is %12s a pointer to struct? %8t \n", "Person{}", KindOf(Person{}) == Pointer2Struct)
 
-	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "[]string{}", IsPtr2Slice([]string{}))
-	fmt.Printf("Is %12s a pointer to struct? %8t \n", "[]string{}", IsPtr2Struct([]string{}))
+	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "[]string{}", KindOf([]string{}) == Pointer2Slice)
+	fmt.Printf("Is %12s a pointer to struct? %8t \n", "[]string{}", KindOf([]string{}) == Pointer2Struct)
 
-	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "i", IsPtr2Slice(i))
-	fmt.Printf("Is %12s a pointer to struct? %8t \n", "i", IsPtr2Struct(i))
+	fmt.Printf("Is %12s a pointer to  slice? %8t \n", "i", KindOf(i) == Pointer2Slice)
+	fmt.Printf("Is %12s a pointer to struct? %8t \n", "i", KindOf(i) == Pointer2Struct)
 
 }
