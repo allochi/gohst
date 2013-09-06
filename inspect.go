@@ -54,6 +54,11 @@ func IsSliceOrPtr2SliceOfPrimitive(i interface{}) (result bool) {
 				result = true
 			}
 		}
+	} else if _value.Type().Kind() == reflect.Slice {
+		_elemKind := _value.Type().Elem().Kind()
+		if (_elemKind > reflect.Invalid) && (_elemKind < reflect.Array || _elemKind == reflect.String) {
+			result = true
+		}
 	}
 	return
 }

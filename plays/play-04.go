@@ -7,6 +7,7 @@ import (
 	"fmt"
 	// "github.com/davecgh/go-spew/spew"
 	// "reflect"
+	"log"
 	"strings"
 )
 
@@ -44,9 +45,11 @@ func UpdateAContact() {
 
 func ContactsOfMailingList() {
 
+	log.Println("-- ContactsOfMailingList ")
+
 	// Get the mailing list
 	var mailingLists []MailingList
-	err := gohst.GET("Contactizer", &mailingLists, []int64{14})
+	err := gohst.GET("Contactizer", &mailingLists, &[]int64{14})
 
 	if err != nil {
 		fmt.Printf("Error getting mailing list: %s", err)

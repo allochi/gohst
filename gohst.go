@@ -45,7 +45,7 @@ func GET(name string, object interface{}, ids interface{}) error {
 		return errors.New("GET accepts a pointer to slice of a struct type as an object")
 	}
 	fmt.Println("Testing ids")
-	if ids != nil && !IsPtr2SliceOfPrimitive(ids) {
+	if ids != nil && !IsSliceOrPtr2SliceOfPrimitive(ids) {
 		return errors.New("GET accepts pointer to slice of a primitive type as ids e.g int64 or string")
 	}
 	fmt.Println("Calling Real GET")
