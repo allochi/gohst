@@ -7,21 +7,24 @@ import (
 	"fmt"
 	// "github.com/davecgh/go-spew/spew"
 	// "reflect"
+	"log"
 	"strings"
 )
 
 var tc = TColor
 
 func init() {
-	Contactizer = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
+	// Contactizer = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
+	Contactizer = gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	Contactizer.CheckCollection = true
 	gohst.Register("Contactizer", Contactizer)
 }
 
 func main() {
 	// MailingListsList()
 	// SamplePostJSon()
-	ContactsOfMailingList()
-	// InsertAContact()
+	// ContactsOfMailingList()
+	InsertAContact()
 }
 
 var Contactizer gohst.PostJsonDataStore
@@ -31,7 +34,10 @@ func InsertAContact() {
 	var contact Contact
 	contact.FirstName = "Allochi"
 	contact.LastName = "AlMuwali"
-	gohst.PUT("Contactizer", contact)
+	err := gohst.PUT("Contactizer", contact)
+	if err != nil {
+		log.Printf("Error: %s", err)
+	}
 }
 
 func UpdateAContact() {
@@ -49,7 +55,7 @@ func ContactsOfMailingList() {
 	err := gohst.GET("Contactizer", &mailingLists, []int64{14})
 
 	if err != nil {
-		fmt.Printf("Error getting mailing list: %s", err)
+		log.Fatalf("Error getting mailing list: %s", err)
 	}
 
 	// Get the contacts

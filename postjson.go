@@ -4,6 +4,7 @@ import (
 	"allochi/inflect"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	_ "github.com/lib/pq"
 	"reflect"
@@ -13,9 +14,12 @@ import (
 )
 
 type PostJsonDataStore struct {
-	DatabaseName string
-	User         string
-	Password     string
+	DatabaseName         string
+	User                 string
+	Password             string
+	CheckCollection      bool
+	AutoCreateCollection bool
+	CollectionNames      []string
 }
 
 type Record struct {
@@ -23,6 +27,27 @@ type Record struct {
 	Data      []byte
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+func NewPostJson(DatabaseName, User, Password string) (store PostJsonDataStore) {
+	store.DatabaseName = DatabaseName
+	store.User = User
+	store.Password = Password
+	return
+}
+
+func (ds PostJsonDataStore) LoadCollectionNames() error {
+	// TODO: Implement
+	return errors.New("Not Implemented")
+}
+
+func (ds PostJsonDataStore) CollectionExists(name string) bool {
+	for _, _name := range ds.CollectionNames {
+		if name == _name {
+			return true
+		}
+	}
+	return false
 }
 
 func (ds PostJsonDataStore) PUT(object interface{}) error {
@@ -46,11 +71,16 @@ func (ds PostJsonDataStore) PUT(object interface{}) error {
 	_typeName := _type.Name()
 	tableName := inflect.Pluralize(inflect.Underscore(_typeName))
 
-	// Transaction?
-	// is it insert or update?
+	if !ds.CollectionExists("jsonk_" + tableName) {
+		return errors.New("Data store collection doesn't exist")
+	}
+	// Check if the table exists using table slice
+	// If not in table slice then execute "IF EXIST" SQL and add it to the slice
+	// If the SQL is false, check if "AutoCreateStore" is true and create the table
+
+	// TODO: Transaction?
 	var sqlStatement string
 	if record.Id == 0 {
-		// TODO: If the store is not there
 		sqlStatement = fmt.Sprintf("INSERT INTO json_%s (data, created_at, updated_at) VALUES ('%s',NOW(),NOW())", tableName, record.Data)
 	} else {
 		sqlStatement = fmt.Sprintf("UPDATE json_%s SET data='%s', updated_at=NOW() WHERE id = %d", tableName, record.Data, record.Id)

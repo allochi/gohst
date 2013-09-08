@@ -33,13 +33,17 @@ func Register(name string, datastore DataStore) error {
 
 func PUT(name string, object interface{}) error {
 	_kind := KindOf(object)
-	if _kind != Struct || _kind != Pointer2Struct {
+	if _kind != Struct && _kind != Pointer2Struct {
 		return errors.New("PUT only accepts an object or a pointer to an object of type struct")
 	}
 	return datastores[name].PUT(object)
 }
 
 func GET(name string, object interface{}, ids interface{}) error {
+	if name == "" {
+		return errors.New("GET requires a data store name")
+	}
+
 	_objectKind := KindOf(object)
 	if _objectKind != Pointer2SliceOfStruct {
 		return errors.New("GET accepts a pointer to slice of a struct type as an object")
@@ -47,7 +51,7 @@ func GET(name string, object interface{}, ids interface{}) error {
 
 	_idsKind := KindOf(ids)
 	if _idsKind != SliceOfPrimitive {
-		return errors.New("GET accepts pointer to slice of a primitive type as ids e.g int64 or string")
+		return errors.New("GET accepts slice of a primitive type as ids e.g int64 or string")
 	}
 
 	return datastores[name].GET(object, ids)

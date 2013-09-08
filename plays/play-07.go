@@ -19,25 +19,17 @@ func main() {
 	fmt.Println("KindOf(person) == Pointer2Struct: ", KindOf(person) == Pointer2Struct)
 
 	var something []uint64
-	// fmt.Println(IsPtr2SliceOfPrimitive(&something))
 	fmt.Println("KindOf(&something) == Pointer2SliceOfPrimitive: ", KindOf(&something) == Pointer2SliceOfPrimitive)
-	// fmt.Println("KindOf(&something) == Pointer2SliceOfPrimitive: ", KindOf(&something))
 
 	var people []Person
-	// fmt.Println(IsPtr2SliceOfStruct(people))
 	fmt.Println("KindOf(people) == Pointer2SliceOfStruct: ", KindOf(people) == Pointer2SliceOfStruct)
 	fmt.Println("KindOf(people) == SliceOfStruct: ", KindOf(people) == SliceOfStruct)
-	// fmt.Println(IsPtr2SliceOfStruct(&people))
 	fmt.Println("KindOf(&people) == Pointer2SliceOfStruct: ", KindOf(&people) == Pointer2SliceOfStruct)
 
-	// fmt.Println(IsPtr2SliceOfStruct(Person{}))
 	fmt.Println("KindOf(Person{}) == Pointer2SliceOfStruct: ", KindOf(Person{}) == Pointer2SliceOfStruct)
-	// fmt.Println(IsPtr2SliceOfStruct(&Person{}))
 	fmt.Println("KindOf(&Person{}) == Pointer2SliceOfStruct: ", KindOf(&Person{}) == Pointer2SliceOfStruct)
 
-	// fmt.Println(IsStructOrPtr2Struct(people))
 	fmt.Println("KindOf(people) == Struct || KindOf(people) == Pointer2Struct: ", KindOf(people) == Struct || KindOf(people) == Pointer2Struct)
-	// fmt.Println(IsStructOrPtr2Struct(&people))
 	fmt.Println("KindOf(&people) == Struct || KindOf(&people) == Pointer2Struct: ", KindOf(&people) == Struct || KindOf(&people) == Pointer2Struct)
 
 }
