@@ -16,7 +16,7 @@ var tc = TColor
 func init() {
 	// Contactizer = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
 	Contactizer = gohst.NewPostJson("allochi_contactizer", "allochi", "")
-	Contactizer.CheckCollection = true
+	Contactizer.CheckCollections = true
 	gohst.Register("Contactizer", Contactizer)
 }
 
@@ -34,6 +34,10 @@ func InsertAContact() {
 	var contact Contact
 	contact.FirstName = "Allochi"
 	contact.LastName = "AlMuwali"
+	// Clean temp insertions
+	// delete from json_contacts where id >= 2107;
+	// select setval('json_contacts_id_seq',2107);
+	// select * from json_contacts where id >= 2107;
 	err := gohst.PUT("Contactizer", contact)
 	if err != nil {
 		log.Printf("Error: %s", err)

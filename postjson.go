@@ -14,12 +14,12 @@ import (
 )
 
 type PostJsonDataStore struct {
-	DatabaseName         string
-	User                 string
-	Password             string
-	CheckCollection      bool
-	AutoCreateCollection bool
-	CollectionNames      []string
+	DatabaseName          string
+	User                  string
+	Password              string
+	CheckCollections      bool
+	AutoCreateCollections bool
+	CollectionNames       []string
 }
 
 type Record struct {
@@ -36,18 +36,28 @@ func NewPostJson(DatabaseName, User, Password string) (store PostJsonDataStore) 
 	return
 }
 
-func (ds PostJsonDataStore) LoadCollectionNames() error {
+func (ds PostJsonDataStore) loadCollectionNames() error {
 	// TODO: Implement
 	return errors.New("Not Implemented")
 }
 
-func (ds PostJsonDataStore) CollectionExists(name string) bool {
+func (ds PostJsonDataStore) collectionExists(name string) bool {
 	for _, _name := range ds.CollectionNames {
 		if name == _name {
 			return true
 		}
 	}
 	return false
+}
+
+func (ds PostJsonDataStore) createCollection(name string) error {
+	// TODO: Create the table
+	var err error
+	if err != nil {
+		return err
+	}
+	ds.CollectionNames = append(ds.CollectionNames, name)
+	return nil
 }
 
 func (ds PostJsonDataStore) PUT(object interface{}) error {
@@ -69,10 +79,14 @@ func (ds PostJsonDataStore) PUT(object interface{}) error {
 
 	_type := reflect.TypeOf(object)
 	_typeName := _type.Name()
-	tableName := inflect.Pluralize(inflect.Underscore(_typeName))
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
 
-	if !ds.CollectionExists("jsonk_" + tableName) {
-		return errors.New("Data store collection doesn't exist")
+	if ds.CheckCollections && !ds.collectionExists(tableName) {
+		if ds.AutoCreateCollections {
+			ds.createCollection(tableName)
+		} else {
+			return fmt.Errorf("Data store \"%s\" collection doesn't exist", tableName)
+		}
 	}
 	// Check if the table exists using table slice
 	// If not in table slice then execute "IF EXIST" SQL and add it to the slice
@@ -81,9 +95,9 @@ func (ds PostJsonDataStore) PUT(object interface{}) error {
 	// TODO: Transaction?
 	var sqlStatement string
 	if record.Id == 0 {
-		sqlStatement = fmt.Sprintf("INSERT INTO json_%s (data, created_at, updated_at) VALUES ('%s',NOW(),NOW())", tableName, record.Data)
+		sqlStatement = fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES ('%s',NOW(),NOW())", tableName, record.Data)
 	} else {
-		sqlStatement = fmt.Sprintf("UPDATE json_%s SET data='%s', updated_at=NOW() WHERE id = %d", tableName, record.Data, record.Id)
+		sqlStatement = fmt.Sprintf("UPDATE %s SET data='%s', updated_at=NOW() WHERE id = %d", tableName, record.Data, record.Id)
 	}
 
 	db, err := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
@@ -106,7 +120,7 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) error {
 	_type := reflect.TypeOf(object).Elem().Elem()
 
 	_typeName := _type.Name()
-	tableName := inflect.Pluralize(inflect.Underscore(_typeName))
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
 
 	db, err := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
 	if err != nil {
@@ -121,9 +135,9 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) error {
 		for i, id := range _ids {
 			_idsStr[i] = strconv.FormatInt(id, 10)
 		}
-		sqlStatement = fmt.Sprintf("select * from json_%s where id in (%s);", tableName, strings.Join(_idsStr, ","))
+		sqlStatement = fmt.Sprintf("select * from %s where id in (%s);", tableName, strings.Join(_idsStr, ","))
 	} else {
-		sqlStatement = fmt.Sprintf("select * from json_%s;", tableName)
+		sqlStatement = fmt.Sprintf("select * from %s;", tableName)
 	}
 	rows, err := db.Query(sqlStatement)
 	if err != nil {
