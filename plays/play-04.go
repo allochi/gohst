@@ -16,6 +16,7 @@ var tc = TColor
 func init() {
 	// Contactizer = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
 	Contactizer = gohst.NewPostJson("allochi_contactizer", "allochi", "")
+
 	Contactizer.CheckCollections = true
 	gohst.Register("Contactizer", Contactizer)
 }
