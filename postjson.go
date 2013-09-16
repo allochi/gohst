@@ -69,8 +69,10 @@ func (ds PostJsonDataStore) collectionExists(name string) (exist bool, err error
 }
 
 func (ds PostJsonDataStore) createCollection(name string) error {
-	// TODO: Create the table
-	var err error
+
+	stmt := fmt.Sprintf(`CREATE TABLE %s ("id" SERIAL PRIMARY KEY, "data" json, "created_at" timestamp(6) NULL, "updated_at" timestamp(6) NULL)`, name)
+
+	err := sqlExecute(stmt)
 	if err != nil {
 		return err
 	}
