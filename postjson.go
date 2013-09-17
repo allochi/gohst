@@ -2,15 +2,22 @@ package gohst
 
 import (
 	"allochi/inflect"
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	// "github.com/davecgh/go-spew/spew"
 	_ "github.com/lib/pq"
 	"log"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+)
+
+var (
+	sqoute    = []byte("'")
+	sqouteESC = []byte("''")
 )
 
 type PostJsonDataStore struct {
@@ -94,7 +101,7 @@ func (ds PostJsonDataStore) PUT(object interface{}) error {
 	if err != nil {
 		return err
 	}
-	record.Data = data
+	record.Data = bytes.Replace(data, sqoute, sqouteESC, -1)
 	record.CreatedAt = _elem.FieldByName("CreatedAt").Interface().(time.Time)
 	record.UpdatedAt = _elem.FieldByName("UpdatedAt").Interface().(time.Time)
 
@@ -116,14 +123,14 @@ func (ds PostJsonDataStore) PUT(object interface{}) error {
 		}
 	}
 
-	var sqlStmts string
+	var sqlStmt string
 	if record.Id == 0 {
-		sqlStmts = fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES ('%s',NOW(),NOW())", tableName, record.Data)
+		sqlStmt = fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES (E'%s',NOW(),NOW()) RETURNING id", tableName, record.Data)
 	} else {
-		sqlStmts = fmt.Sprintf("UPDATE %s SET data='%s', updated_at=NOW() WHERE id = %d", tableName, record.Data, record.Id)
+		sqlStmt = fmt.Sprintf("UPDATE %s SET data=E'%s', updated_at=NOW() WHERE id = %d", tableName, record.Data, record.Id)
 	}
 
-	_, err = ds.sqlExecute(sqlStmts)
+	_, err = ds.sqlExecute(sqlStmt)
 
 	return err
 }
@@ -169,15 +176,20 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) error {
 	return nil
 }
 
-func (ds PostJsonDataStore) sqlExecute(sqlStmts string) (result sql.Result, err error) {
+func (ds PostJsonDataStore) sqlExecute(sqlStmt string) (result sql.Result, err error) {
 
 	db, err := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
 	if err != nil {
 		return
 	}
 	defer db.Close()
-	log.Println(sqlStmts)
-	result, err = db.Exec(sqlStmts)
+	// log.Println(sqlStmt)
+	// result, err = db.Exec(sqlStmt)
+	// id, _ := result.LastInsertId()
+
+	var id int64
+	err = db.QueryRow(sqlStmt).Scan(&id)
+	log.Println(id)
 	if err != nil {
 		return
 	}
