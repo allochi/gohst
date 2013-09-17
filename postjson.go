@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "github.com/lib/pq"
+	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -72,7 +73,7 @@ func (ds PostJsonDataStore) createCollection(name string) error {
 
 	stmt := fmt.Sprintf(`CREATE TABLE %s ("id" SERIAL PRIMARY KEY, "data" json, "created_at" timestamp(6) NULL, "updated_at" timestamp(6) NULL)`, name)
 
-	err := sqlExecute(stmt)
+	_, err := ds.sqlExecute(stmt)
 	if err != nil {
 		return err
 	}
@@ -175,7 +176,7 @@ func (ds PostJsonDataStore) sqlExecute(sqlStmts string) (result sql.Result, err 
 		return
 	}
 	defer db.Close()
-
+	log.Println(sqlStmts)
 	result, err = db.Exec(sqlStmts)
 	if err != nil {
 		return
