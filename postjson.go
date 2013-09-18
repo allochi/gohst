@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
+	// "github.com/davecgh/go-spew/spew"
 	_ "github.com/lib/pq"
 	// "log"
 	"reflect"
@@ -24,9 +24,11 @@ type PostJsonDataStore struct {
 	DatabaseName          string
 	User                  string
 	Password              string
+	DB                    *sql.DB
 	CheckCollections      bool
 	AutoCreateCollections bool
-	CollectionNames       []string
+	CollectionNames       map[string]bool
+	CollectionStmts       map[string]map[string]*sql.Stmt
 }
 
 type Record struct {
@@ -36,23 +38,46 @@ type Record struct {
 	UpdatedAt time.Time
 }
 
+// Result is an implementation of sql.Result to use with methods like sql.Execute
+// Its only intention is for LastInsertedId for PostJson
 type Result struct {
 	id    int64
 	count int64
 }
 
+// LastInsertId returns the last inserted record id
 func (r Result) LastInsertId() (int64, error) {
 	return r.id, nil
 }
 
+// RowsAffected returns how many records were affected by a query
 func (r Result) RowsAffected() (int64, error) {
 	return r.count, nil
 }
 
+// NewPostJson creates new store object only
 func NewPostJson(DatabaseName, User, Password string) (store PostJsonDataStore) {
 	store.DatabaseName = DatabaseName
 	store.User = User
 	store.Password = Password
+	store.CollectionNames = make(map[string]bool)
+	store.CollectionStmts = make(map[string]map[string]*sql.Stmt)
+	return
+}
+
+func (ds *PostJsonDataStore) Connect() (err error) {
+	ds.DB, err = sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
+	if err != nil {
+		return
+	}
+	err = ds.DB.Ping()
+	return
+}
+
+func (ds *PostJsonDataStore) Disconnect() (err error) {
+	if ds.DB != nil {
+		err = ds.DB.Close()
+	}
 	return
 }
 
@@ -60,15 +85,18 @@ func (ds *PostJsonDataStore) loadCollectionNames() (err error) {
 
 	query := "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
 	rows, err := ds.sqlQuery(query)
+	if err != nil {
+		return
+	}
 	defer rows.Close()
-	var names []string
+
 	if err == nil {
 		for rows.Next() {
-			var table_name string
-			rows.Scan(&table_name)
-			names = append(names, table_name)
+			var tableName string
+			rows.Scan(&tableName)
+			ds.CollectionNames[tableName] = true
+			ds.prepareStatements(tableName)
 		}
-		ds.CollectionNames = names
 	}
 
 	return
@@ -81,11 +109,8 @@ func (ds PostJsonDataStore) collectionExists(name string) (exist bool, err error
 		}
 	}
 
-	for _, _name := range ds.CollectionNames {
-		if name == _name {
-			return true, nil
-		}
-	}
+	exist = ds.CollectionNames[name]
+
 	return
 }
 
@@ -97,30 +122,41 @@ func (ds PostJsonDataStore) createCollection(name string) error {
 	if err != nil {
 		return err
 	}
-	ds.CollectionNames = append(ds.CollectionNames, name)
+	ds.CollectionNames[name] = true
+	ds.prepareStatements(name)
 	return nil
 }
 
 func (ds PostJsonDataStore) PUT(object interface{}) error {
 
+	// Check what kind of object passed
+	var _elem reflect.Value
+	_kind := KindOf(object)
+	switch _kind {
+	case Struct:
+		_elem = reflect.ValueOf(object)
+	case Pointer2Struct:
+		_elem = reflect.Indirect(reflect.ValueOf(object))
+	}
+
+	_type := _elem.Type()
+	_typeName := _type.Name()
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
+
 	record := Record{}
-
-	_elem := reflect.ValueOf(object)
-
-	// ID is a Sequence of integers, Not sure about other ID types
+	// ID
 	record.Id = _elem.FieldByName("Id").Int()
 
+	// Data
 	data, err := json.Marshal(object)
 	if err != nil {
 		return err
 	}
 	record.Data = bytes.Replace(data, sqoute, sqouteESC, -1)
+
+	// Time Stamps
 	record.CreatedAt = _elem.FieldByName("CreatedAt").Interface().(time.Time)
 	record.UpdatedAt = _elem.FieldByName("UpdatedAt").Interface().(time.Time)
-
-	_type := reflect.TypeOf(object)
-	_typeName := _type.Name()
-	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
 
 	if ds.CheckCollections {
 		exist, err := ds.collectionExists(tableName)
@@ -138,15 +174,22 @@ func (ds PostJsonDataStore) PUT(object interface{}) error {
 
 	var sqlStmt string
 	if record.Id == 0 {
-		sqlStmt = fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES (E'%s',NOW(),NOW()) RETURNING id", tableName, record.Data)
+		if _kind == Pointer2Struct {
+			sqlStmt = fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES (E'%s',NOW(),NOW()) RETURNING id", tableName, record.Data)
+		} else {
+			sqlStmt = fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES (E'%s',NOW(),NOW())", tableName, record.Data)
+		}
 	} else {
 		sqlStmt = fmt.Sprintf("UPDATE %s SET data=E'%s', updated_at=NOW() WHERE id = %d", tableName, record.Data, record.Id)
 	}
 
 	result, err := ds.sqlExecute(sqlStmt)
-	id, err := result.LastInsertId()
-	_elem.FieldByName("Id").SetInt(id)
-	spew.Dump(object)
+	if _kind == Pointer2Struct {
+		var id int64
+		id, err = result.LastInsertId()
+		_elem.FieldByName("Id").SetInt(id)
+	}
+
 	return err
 }
 
@@ -193,14 +236,12 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) error {
 
 func (ds PostJsonDataStore) sqlExecute(sqlStmt string) (sql.Result, error) {
 
-	db, err := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
-	if err != nil {
-		return nil, err
+	if ds.DB == nil {
+		return nil, fmt.Errorf("Data store not connected")
 	}
-	defer db.Close()
+
 	result := Result{}
-	err = db.QueryRow(sqlStmt).Scan(&result.id)
-	// result, err = db.Exec(sqlStmt)
+	err := ds.DB.QueryRow(sqlStmt).Scan(&result.id)
 	if err != nil {
 		return nil, err
 	}
@@ -210,16 +251,33 @@ func (ds PostJsonDataStore) sqlExecute(sqlStmt string) (sql.Result, error) {
 
 func (ds PostJsonDataStore) sqlQuery(sqlStmt string) (*sql.Rows, error) {
 
-	db, err := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
-	if err != nil {
-		return nil, err
+	if ds.DB == nil {
+		return nil, fmt.Errorf("Data store not connected")
 	}
-	defer db.Close()
 
-	rows, err := db.Query(sqlStmt)
+	rows, err := ds.DB.Query(sqlStmt)
 	if err != nil {
 		return nil, err
 	}
 
 	return rows, nil
+}
+
+func (ds *PostJsonDataStore) prepareStatements(tableName string) (err error) {
+
+	stmts := make(map[string]*sql.Stmt)
+
+	insertSQL := fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES (E$1,NOW(),NOW())", tableName)
+	updateSQL := fmt.Sprintf("UPDATE %s SET data=E$1, updated_at=NOW() WHERE id = $2", tableName)
+	selectSQL := fmt.Sprintf("select * from %s", tableName)
+
+	stmts["INS"], err = ds.DB.Prepare(insertSQL)
+	stmts["INSID"], err = ds.DB.Prepare(insertSQL + " RETURNING id")
+	stmts["UPD"], err = ds.DB.Prepare(updateSQL)
+	stmts["SEL"], err = ds.DB.Prepare(selectSQL)
+	stmts["SELID"], err = ds.DB.Prepare(selectSQL + " where id = $1")
+	stmts["SELIN"], err = ds.DB.Prepare(selectSQL + " where id in (select unnest(string_to_array($1, ',')::integer[]))")
+
+	return
+
 }
