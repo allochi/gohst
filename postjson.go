@@ -6,9 +6,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	// "github.com/davecgh/go-spew/spew"
+	"github.com/davecgh/go-spew/spew"
 	_ "github.com/lib/pq"
-	"log"
+	// "log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -34,6 +34,19 @@ type Record struct {
 	Data      []byte
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type Result struct {
+	id    int64
+	count int64
+}
+
+func (r Result) LastInsertId() (int64, error) {
+	return r.id, nil
+}
+
+func (r Result) RowsAffected() (int64, error) {
+	return r.count, nil
 }
 
 func NewPostJson(DatabaseName, User, Password string) (store PostJsonDataStore) {
@@ -130,8 +143,10 @@ func (ds PostJsonDataStore) PUT(object interface{}) error {
 		sqlStmt = fmt.Sprintf("UPDATE %s SET data=E'%s', updated_at=NOW() WHERE id = %d", tableName, record.Data, record.Id)
 	}
 
-	_, err = ds.sqlExecute(sqlStmt)
-
+	result, err := ds.sqlExecute(sqlStmt)
+	id, err := result.LastInsertId()
+	_elem.FieldByName("Id").SetInt(id)
+	spew.Dump(object)
 	return err
 }
 
@@ -176,39 +191,35 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) error {
 	return nil
 }
 
-func (ds PostJsonDataStore) sqlExecute(sqlStmt string) (result sql.Result, err error) {
+func (ds PostJsonDataStore) sqlExecute(sqlStmt string) (sql.Result, error) {
 
 	db, err := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
 	if err != nil {
-		return
+		return nil, err
 	}
 	defer db.Close()
-	// log.Println(sqlStmt)
+	result := Result{}
+	err = db.QueryRow(sqlStmt).Scan(&result.id)
 	// result, err = db.Exec(sqlStmt)
-	// id, _ := result.LastInsertId()
-
-	var id int64
-	err = db.QueryRow(sqlStmt).Scan(&id)
-	log.Println(id)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return
+	return result, nil
 }
 
-func (ds PostJsonDataStore) sqlQuery(sqlStmt string) (rows *sql.Rows, err error) {
+func (ds PostJsonDataStore) sqlQuery(sqlStmt string) (*sql.Rows, error) {
 
 	db, err := sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
 	if err != nil {
-		return
+		return nil, err
 	}
 	defer db.Close()
 
-	rows, err = db.Query(sqlStmt)
+	rows, err := db.Query(sqlStmt)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return
+	return rows, nil
 }
