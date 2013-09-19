@@ -11,10 +11,11 @@ import (
 )
 
 // Benchmark 10000
-// 7.281s play-09
-// 7.154s play-10 JSON (98.25%)
-// 6.890s play-10 FLAT (94.62%)
-// 4.262s play-10 PREPARED JSON (58.53%)
+// A|3.298s           play-09 PREPARED JSON (~3000 r/s)
+// A|8.116s 17|7.281s play-09
+// A|7.405s 17|7.154s play-10 JSON (98.25%)
+//          17|6.890s play-10 FLAT (94.62%)
+// A|4.281s 17|4.262s play-10 PREPARED JSON (58.53%)
 
 func main() {
 

@@ -38,23 +38,6 @@ type Record struct {
 	UpdatedAt time.Time
 }
 
-// Result is an implementation of sql.Result to use with methods like sql.Execute
-// Its only intention is for LastInsertedId for PostJson
-type Result struct {
-	id    int64
-	count int64
-}
-
-// LastInsertId returns the last inserted record id
-func (r Result) LastInsertId() (int64, error) {
-	return r.id, nil
-}
-
-// RowsAffected returns how many records were affected by a query
-func (r Result) RowsAffected() (int64, error) {
-	return r.count, nil
-}
-
 // NewPostJson creates new store object only
 func NewPostJson(DatabaseName, User, Password string) (store PostJsonDataStore) {
 	store.DatabaseName = DatabaseName
@@ -70,7 +53,13 @@ func (ds *PostJsonDataStore) Connect() (err error) {
 	if err != nil {
 		return
 	}
+
 	err = ds.DB.Ping()
+	if err != nil {
+		return
+	}
+
+	err = ds.loadCollectionNames()
 	return
 }
 
@@ -83,8 +72,8 @@ func (ds *PostJsonDataStore) Disconnect() (err error) {
 
 func (ds *PostJsonDataStore) loadCollectionNames() (err error) {
 
-	query := "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
-	rows, err := ds.sqlQuery(query)
+	query := "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' AND table_name LIKE 'json_%';"
+	rows, err := ds.DB.Query(query)
 	if err != nil {
 		return
 	}
@@ -118,7 +107,7 @@ func (ds PostJsonDataStore) createCollection(name string) error {
 
 	stmt := fmt.Sprintf(`CREATE TABLE %s ("id" SERIAL PRIMARY KEY, "data" json, "created_at" timestamp(6) NULL, "updated_at" timestamp(6) NULL)`, name)
 
-	_, err := ds.sqlExecute(stmt)
+	_, err := ds.DB.Exec(stmt)
 	if err != nil {
 		return err
 	}
@@ -129,7 +118,7 @@ func (ds PostJsonDataStore) createCollection(name string) error {
 
 func (ds PostJsonDataStore) PUT(object interface{}) error {
 
-	// Check what kind of object passed
+	// Check type of object & get the name of collection ------------------------------
 	var _elem reflect.Value
 	_kind := KindOf(object)
 	switch _kind {
@@ -139,24 +128,27 @@ func (ds PostJsonDataStore) PUT(object interface{}) error {
 		_elem = reflect.Indirect(reflect.ValueOf(object))
 	}
 
+	record := Record{}
 	_type := _elem.Type()
 	_typeName := _type.Name()
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
 
-	record := Record{}
-	// ID
+	// ID -----------------------------------------------------------------------------
 	record.Id = _elem.FieldByName("Id").Int()
 
-	// Data
+	// Data ---------------------------------------------------------------------------
 	data, err := json.Marshal(object)
 	if err != nil {
 		return err
 	}
 	record.Data = bytes.Replace(data, sqoute, sqouteESC, -1)
 
-	// Time Stamps
+	// Time Stamps --------------------------------------------------------------------
+
 	record.CreatedAt = _elem.FieldByName("CreatedAt").Interface().(time.Time)
 	record.UpdatedAt = _elem.FieldByName("UpdatedAt").Interface().(time.Time)
+
+	// Check & Create Collections -----------------------------------------------------
 
 	if ds.CheckCollections {
 		exist, err := ds.collectionExists(tableName)
@@ -172,28 +164,23 @@ func (ds PostJsonDataStore) PUT(object interface{}) error {
 		}
 	}
 
-	var sqlStmt string
+	// Write to database --------------------------------------------------------------
+
 	if record.Id == 0 {
 		if _kind == Pointer2Struct {
-			sqlStmt = fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES (E'%s',NOW(),NOW()) RETURNING id", tableName, record.Data)
+			ds.CollectionStmts[tableName]["INSID"].QueryRow(record.Data).Scan(&record.Id)
+			_elem.FieldByName("Id").SetInt(record.Id)
 		} else {
-			sqlStmt = fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES (E'%s',NOW(),NOW())", tableName, record.Data)
+			ds.CollectionStmts[tableName]["INS"].Exec(record.Data)
 		}
 	} else {
-		sqlStmt = fmt.Sprintf("UPDATE %s SET data=E'%s', updated_at=NOW() WHERE id = %d", tableName, record.Data, record.Id)
-	}
-
-	result, err := ds.sqlExecute(sqlStmt)
-	if _kind == Pointer2Struct {
-		var id int64
-		id, err = result.LastInsertId()
-		_elem.FieldByName("Id").SetInt(id)
+		ds.CollectionStmts[tableName]["UPD"].Exec(record.Data, record.Id)
 	}
 
 	return err
 }
 
-func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) error {
+func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (err error) {
 
 	_slice := reflect.Indirect(reflect.ValueOf(object))
 	_type := reflect.TypeOf(object).Elem().Elem()
@@ -201,20 +188,22 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) error {
 	_typeName := _type.Name()
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
 
-	var sqlStmt string
-	if ids != nil {
-		_ids := ids.([]int64)
+	var rows *sql.Rows
+	_ids := ids.([]int64)
+	if len(_ids) > 1 {
 		_idsStr := make([]string, len(_ids))
 		for i, id := range _ids {
 			_idsStr[i] = strconv.FormatInt(id, 10)
 		}
-		sqlStmt = fmt.Sprintf("select * from %s where id in (%s);", tableName, strings.Join(_idsStr, ","))
+		rows, err = ds.CollectionStmts[tableName]["SELIN"].Query(strings.Join(_idsStr, ","))
+	} else if len(_ids) == 1 {
+		rows, err = ds.CollectionStmts[tableName]["SELID"].Query(_ids[0])
 	} else {
-		sqlStmt = fmt.Sprintf("select * from %s;", tableName)
+		rows, err = ds.CollectionStmts[tableName]["SEL"].Query()
 	}
-	rows, err := ds.sqlQuery(sqlStmt)
+
 	if err != nil {
-		return err
+		return
 	}
 	defer rows.Close()
 
@@ -231,44 +220,15 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) error {
 		_slice.Set(reflect.Append(_slice, _object.Elem()))
 	}
 
-	return nil
-}
-
-func (ds PostJsonDataStore) sqlExecute(sqlStmt string) (sql.Result, error) {
-
-	if ds.DB == nil {
-		return nil, fmt.Errorf("Data store not connected")
-	}
-
-	result := Result{}
-	err := ds.DB.QueryRow(sqlStmt).Scan(&result.id)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
-func (ds PostJsonDataStore) sqlQuery(sqlStmt string) (*sql.Rows, error) {
-
-	if ds.DB == nil {
-		return nil, fmt.Errorf("Data store not connected")
-	}
-
-	rows, err := ds.DB.Query(sqlStmt)
-	if err != nil {
-		return nil, err
-	}
-
-	return rows, nil
+	return
 }
 
 func (ds *PostJsonDataStore) prepareStatements(tableName string) (err error) {
 
 	stmts := make(map[string]*sql.Stmt)
 
-	insertSQL := fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES (E$1,NOW(),NOW())", tableName)
-	updateSQL := fmt.Sprintf("UPDATE %s SET data=E$1, updated_at=NOW() WHERE id = $2", tableName)
+	insertSQL := fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES ($1,NOW(),NOW())", tableName)
+	updateSQL := fmt.Sprintf("UPDATE %s SET data=$1, updated_at=NOW() WHERE id = $2", tableName)
 	selectSQL := fmt.Sprintf("select * from %s", tableName)
 
 	stmts["INS"], err = ds.DB.Prepare(insertSQL)
@@ -277,6 +237,8 @@ func (ds *PostJsonDataStore) prepareStatements(tableName string) (err error) {
 	stmts["SEL"], err = ds.DB.Prepare(selectSQL)
 	stmts["SELID"], err = ds.DB.Prepare(selectSQL + " where id = $1")
 	stmts["SELIN"], err = ds.DB.Prepare(selectSQL + " where id in (select unnest(string_to_array($1, ',')::integer[]))")
+
+	ds.CollectionStmts[tableName] = stmts
 
 	return
 
