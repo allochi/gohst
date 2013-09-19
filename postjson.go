@@ -223,13 +223,40 @@ func (ds PostJsonDataStore) GET(object interface{}, ids interface{}) (err error)
 	return
 }
 
+func (ds PostJsonDataStore) DELETE(object interface{}, ids interface{}) (err error) {
+
+	_objectKind := KindOf(object)
+	_type := reflect.TypeOf(object).Elem()
+	if _objectKind == Pointer2SliceOfStruct {
+		ds.GET(object, ids)
+		_type = reflect.TypeOf(object).Elem().Elem()
+	}
+
+	_typeName := _type.Name()
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
+
+	_ids := ids.([]int64)
+	if len(_ids) > 1 {
+		_idsStr := make([]string, len(_ids))
+		for i, id := range _ids {
+			_idsStr[i] = strconv.FormatInt(id, 10)
+		}
+		_, err = ds.CollectionStmts[tableName]["DELIN"].Exec(strings.Join(_idsStr, ","))
+	} else if len(_ids) == 1 {
+		_, err = ds.CollectionStmts[tableName]["DELID"].Exec(_ids[0])
+	}
+
+	return
+}
+
 func (ds *PostJsonDataStore) prepareStatements(tableName string) (err error) {
 
 	stmts := make(map[string]*sql.Stmt)
 
 	insertSQL := fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES ($1,NOW(),NOW())", tableName)
 	updateSQL := fmt.Sprintf("UPDATE %s SET data=$1, updated_at=NOW() WHERE id = $2", tableName)
-	selectSQL := fmt.Sprintf("select * from %s", tableName)
+	selectSQL := fmt.Sprintf("SELECT * FROM %s", tableName)
+	deleteSQL := fmt.Sprintf("DELETE FROM %s", tableName)
 
 	stmts["INS"], err = ds.DB.Prepare(insertSQL)
 	stmts["INSID"], err = ds.DB.Prepare(insertSQL + " RETURNING id")
@@ -237,6 +264,8 @@ func (ds *PostJsonDataStore) prepareStatements(tableName string) (err error) {
 	stmts["SEL"], err = ds.DB.Prepare(selectSQL)
 	stmts["SELID"], err = ds.DB.Prepare(selectSQL + " where id = $1")
 	stmts["SELIN"], err = ds.DB.Prepare(selectSQL + " where id in (select unnest(string_to_array($1, ',')::integer[]))")
+	stmts["DELID"], err = ds.DB.Prepare(deleteSQL + " where id = $1")
+	stmts["DELIN"], err = ds.DB.Prepare(deleteSQL + " where id in (select unnest(string_to_array($1, ',')::integer[]))")
 
 	ds.CollectionStmts[tableName] = stmts
 

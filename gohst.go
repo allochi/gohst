@@ -12,6 +12,7 @@ func init() {
 type DataStore interface {
 	PUT(interface{}) error
 	GET(interface{}, interface{}) error
+	DELETE(interface{}, interface{}) error
 }
 
 func Register(name string, datastore DataStore) error {
@@ -55,4 +56,22 @@ func GET(name string, object interface{}, ids interface{}) error {
 	}
 
 	return datastores[name].GET(object, ids)
+}
+
+func DELETE(name string, object interface{}, ids interface{}) error {
+	if name == "" {
+		return errors.New("DELETE requires a data store name")
+	}
+
+	_objectKind := KindOf(object)
+	if _objectKind != Pointer2SliceOfStruct && _objectKind != SliceOfStruct {
+		return errors.New("DELETE accepts a slice or pointer to slice of a struct type as an object")
+	}
+
+	_idsKind := KindOf(ids)
+	if _idsKind != SliceOfPrimitive {
+		return errors.New("DELETE accepts slice of a primitive type as ids e.g int64 or string")
+	}
+
+	return datastores[name].DELETE(object, ids)
 }

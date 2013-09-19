@@ -11,7 +11,7 @@ import (
 )
 
 // Benchmark 10000
-// A|3.298s           play-09 PREPARED JSON (~3000 r/s)
+// A|3.298s 17|4.774S play-09 PREPARED JSON (~3000 r/s)
 // A|8.116s 17|7.281s play-09
 // A|7.405s 17|7.154s play-10 JSON (98.25%)
 //          17|6.890s play-10 FLAT (94.62%)
