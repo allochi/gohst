@@ -46,7 +46,50 @@ func TestReadData(t *testing.T) {
 	}
 }
 
+func TestInsertAndDelete(t *testing.T) {
+
+	var Contactizer gohst.PostJsonDataStore
+	Contactizer = gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	Contactizer.Connect()
+	// defer Contactizer.Disconnect()
+	gohst.Register("Contactizer", Contactizer)
+
+	bog := Bog{}
+	bog.Name = "Ali Anwar"
+	bog.Messages = []string{"Go is cool", "PostgreSQL is cool"}
+	bog.Tags = []string{"Go", "PostgreSQL"}
+	bog.Link = "http://www.allochi.com"
+
+	// Return and ID
+	err := gohst.PUT("Contactizer", &bog)
+
+	if err != nil {
+		t.Fatalf("gohst error: %s", err)
+	}
+
+	if bog.Id <= 0 {
+		t.Errorf("PUT: Expected an ID > 0 got %d", bog.Id)
+	}
+
+	ids := []int64{bog.Id}
+
+	err = gohst.DELETE("Contactizer", []Bog{}, ids)
+
+	if err != nil {
+		t.Fatalf("gohst error: %s", err)
+	}
+
+	var bogs []Bog
+	err = gohst.GET("Contactizer", &bogs, ids)
+
+	if len(bogs) > 0 {
+		t.Errorf("DELETE: Didn't expect an object got %d", len(bogs))
+	}
+
+}
+
 // 17: BenchmarkReadData	    5000	    347401 ns/op
+// 13: BenchmarkReadData	    5000	    348989 ns/op
 func BenchmarkReadData(b *testing.B) {
 
 	b.StopTimer()

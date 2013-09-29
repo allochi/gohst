@@ -110,7 +110,9 @@ func AllContacts() {
 		log.Fatalf("... %s", err)
 	}
 	for _, contact := range contacts {
-		fmt.Printf("[%4d] %s \n", contact.Id, contact.Name())
+		// fmt.Printf("[%4d] %s \n", contact.Id, contact.Name())
+		fmt.Printf("%#v\n\n", contact)
+		fmt.Printf("%+v\n\n", contact)
 	}
 }
 
