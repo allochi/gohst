@@ -48,7 +48,7 @@ func NewPostJson(DatabaseName, User, Password string) (store PostJsonDataStore) 
 	return
 }
 
-func (ds *PostJsonDataStore) Connect() (err error) {
+func (ds PostJsonDataStore) Connect() (err error) {
 	ds.DB, err = sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
 	if err != nil {
 		return
@@ -63,7 +63,7 @@ func (ds *PostJsonDataStore) Connect() (err error) {
 	return
 }
 
-func (ds *PostJsonDataStore) Disconnect() (err error) {
+func (ds PostJsonDataStore) Disconnect() (err error) {
 	if ds.DB != nil {
 		err = ds.DB.Close()
 	}

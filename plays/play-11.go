@@ -9,14 +9,17 @@ import (
 )
 
 var tc = TColor
-var Contactizer gohst.PostJsonDataStore
+
+var Contactizer gohst.DataStore
 
 func init() {
-	Contactizer = gohst.NewPostJson("allochi_contactizer", "allochi", "")
+
+	ContactizerJson := gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	ContactizerJson.CheckCollections = true
+	ContactizerJson.AutoCreateCollections = true
+
+	Contactizer.Register("Contactizer", ContactizerJson)
 	Contactizer.Connect()
-	Contactizer.CheckCollections = true
-	Contactizer.AutoCreateCollections = true
-	gohst.Register("Contactizer", Contactizer)
 }
 
 func main() {
@@ -26,7 +29,7 @@ func main() {
 	var bogs []Bog
 	for i := 0; i < 8; i++ {
 		var bog Bog
-		gohst.PUT("Contactizer", &bog)
+		Contactizer.PUT(&bog)
 		bogs = append(bogs, bog)
 	}
 
@@ -38,8 +41,8 @@ func main() {
 
 	// Delete without return deleted objects
 	var bogs2Delete []Bog
-	err := gohst.DELETE("Contactizer", bogs2Delete, firstIds)
-	// err := gohst.DELETE("Contactizer", &bogs2Delete, firstIds)
+	err := Contactizer.DELETE(bogs2Delete, firstIds)
+	// err := Contactizer.DELETE(&bogs2Delete, firstIds)
 	if err != nil {
 		log.Printf("Error: %s", err)
 	}
@@ -47,7 +50,7 @@ func main() {
 
 	// Try to get them
 	var deletedBogs []Bog
-	gohst.GET("Contactizer", &deletedBogs, firstIds)
+	Contactizer.GET(&deletedBogs, firstIds)
 	log.Printf("Found %d of deleted bogs", len(deletedBogs))
 
 	spew.Dump(bogs2Delete)

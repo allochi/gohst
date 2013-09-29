@@ -15,10 +15,16 @@ var tc = TColor
 
 func init() {
 	// Contactizer = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
-	Contactizer = gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	// Contactizer = gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	// Contactizer.Connect()
+	// Contactizer.CheckCollections = true
+	// gohst.Register("Contactizer", Contactizer)
+
+	var Contactizer gohst.DataStore
+	ContactizerJson := gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	Contactizer.Register("Contactizer", ContactizerJson)
 	Contactizer.Connect()
-	Contactizer.CheckCollections = true
-	gohst.Register("Contactizer", Contactizer)
+	// Contactizer.Container.CheckCollections = true
 }
 
 func main() {
@@ -33,7 +39,8 @@ func main() {
 	AllContacts()
 }
 
-var Contactizer gohst.PostJsonDataStore
+// var Contactizer gohst.PostJsonDataStore
+var Contactizer gohst.DataStore
 
 func InsertAContact() {
 
@@ -44,7 +51,7 @@ func InsertAContact() {
 	// delete from json_contacts where id >= 2107;
 	// select setval('json_contacts_id_seq',2107);
 	// select * from json_contacts where id >= 2107;
-	err := gohst.PUT("Contactizer", contact)
+	err := Contactizer.PUT(contact)
 	if err != nil {
 		log.Printf("Error: %s", err)
 	}
@@ -52,17 +59,17 @@ func InsertAContact() {
 
 func UpdateAContact() {
 	var contacts []Contact
-	gohst.GET("Contactizer", &contacts, []int64{1})
+	Contactizer.GET(&contacts, []int64{1})
 	contact := contacts[0]
 	// spew.Dump(contact)
-	gohst.PUT("Contactizer", contact)
+	Contactizer.PUT(contact)
 }
 
 func ContactsOfMailingList() {
 
 	// Get the mailing list
 	var mailingLists []MailingList
-	err := gohst.GET("Contactizer", &mailingLists, []int64{14})
+	err := Contactizer.GET(&mailingLists, []int64{14})
 
 	if err != nil {
 		log.Fatalf("Error getting mailing list: %s", err)
@@ -70,7 +77,7 @@ func ContactsOfMailingList() {
 
 	// Get the contacts
 	var contacts []Contact
-	gohst.GET("Contactizer", &contacts, mailingLists[0].ContactIds)
+	Contactizer.GET(&contacts, mailingLists[0].ContactIds)
 
 	for _, contact := range contacts {
 		InterestOfContact(contact)
@@ -84,7 +91,7 @@ func ContactsOfMailingList() {
 func MailingListsList() {
 	var mailingLists []MailingList
 	recordIDs := []int64{1, 2, 3}
-	gohst.GET("Contactizer", &mailingLists, recordIDs)
+	Contactizer.GET(&mailingLists, recordIDs)
 	for _, mailingList := range mailingLists {
 		fmt.Printf("> %s (%d)\n", mailingList.Name, len(mailingList.ContactIds))
 	}
@@ -92,8 +99,8 @@ func MailingListsList() {
 
 func AllMailingLists() {
 	var mailingLists []MailingList
-	// err := gohst.GET("Contactizer", &mailingLists, []int64{4, 5, 6, 7, 8, 9})
-	err := gohst.GET("Contactizer", &mailingLists, []int64{})
+	// err := Contactizer.GET(&mailingLists, []int64{4, 5, 6, 7, 8, 9})
+	err := Contactizer.GET(&mailingLists, []int64{})
 	if err != nil {
 		log.Fatalf("... %s", err)
 	}
@@ -104,8 +111,13 @@ func AllMailingLists() {
 
 func AllContacts() {
 	var contacts []Contact
-	// err := gohst.GET("Contactizer", &contacts, []int64{4, 5, 6, 7, 8, 9})
-	err := gohst.GET("Contactizer", &contacts, []int64{})
+	// err := Contactizer.GET(&contacts, []int64{4, 5, 6, 7, 8, 9})
+	// err := Contactizer.GET(&contacts, []int64{})
+	ds, err := gohst.GetDataStore("Contactizer")
+	if err != nil {
+		fmt.Errorf("err: %s", err)
+	}
+	err = ds.GET(&contacts, []int64{})
 	if err != nil {
 		log.Fatalf("... %s", err)
 	}
@@ -119,7 +131,7 @@ func AllContacts() {
 func SamplePostJSon() {
 
 	var contacts []Contact
-	gohst.GET("Contactizer", &contacts, []int64{1, 2, 3, 4})
+	Contactizer.GET(&contacts, []int64{1, 2, 3, 4})
 	for _, contact := range contacts {
 		InterestOfContact(contact)
 	}
