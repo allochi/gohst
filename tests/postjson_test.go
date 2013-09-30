@@ -87,11 +87,16 @@ func TestInsertAndDelete(t *testing.T) {
 
 }
 
-// 17: BenchmarkReadData	    5000	    347401 ns/op
-// 13: BenchmarkReadData	    5000	    348989 ns/op
-// 13: BenchmarkReadData	    5000	    361726 ns/op
-// 13: BenchmarkReadData	   10000	    342638 ns/op (2918 op/s)
-// 13: BenchmarkReadData	   10000	    313696 ns/op (3187 op/s)
+// ==========
+// 17: BenchmarkReadData	    5000	    347401 ns/op (indirect access)
+// 17: BenchmarkReadData	    5000	    315161 ns/op (3172 op/s - direct access)
+// 17: BenchmarkReadData	    5000	    314334 ns/op (3181 op/s - direct access)
+// ==========
+// 13: BenchmarkReadData	    5000	    348989 ns/op (indirect access)
+// 13: BenchmarkReadData	    5000	    361726 ns/op (indirect access)
+// 13: BenchmarkReadData	   10000	    342638 ns/op (2918 op/s - direct access)
+// 13: BenchmarkReadData	   10000	    313696 ns/op (3187 op/s - direct access)
+// ==========
 func BenchmarkReadData(b *testing.B) {
 
 	// b.StopTimer()
