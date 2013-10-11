@@ -251,23 +251,33 @@ func (ds PostJsonDataStore) DELETE(object interface{}, ids interface{}) (err err
 
 func (ds *PostJsonDataStore) prepareStatements(tableName string) (err error) {
 
-	stmts := make(map[string]*sql.Stmt)
+	sqls := make(map[string]string)
+	prepared := make(map[string]*sql.Stmt)
 
-	insertSQL := fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES ($1,NOW(),NOW())", tableName)
-	updateSQL := fmt.Sprintf("UPDATE %s SET data=$1, updated_at=NOW() WHERE id = $2", tableName)
-	selectSQL := fmt.Sprintf("SELECT * FROM %s", tableName)
-	deleteSQL := fmt.Sprintf("DELETE FROM %s", tableName)
+	// INSERT
+	sqls["INS"] = fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES ($1,NOW(),NOW())", tableName)
+	sqls["INSID"] = fmt.Sprintf("INSERT INTO %s (data, created_at, updated_at) VALUES ($1,NOW(),NOW()) RETURNING id", tableName)
 
-	stmts["INS"], err = ds.DB.Prepare(insertSQL)
-	stmts["INSID"], err = ds.DB.Prepare(insertSQL + " RETURNING id")
-	stmts["UPD"], err = ds.DB.Prepare(updateSQL)
-	stmts["SEL"], err = ds.DB.Prepare(selectSQL)
-	stmts["SELID"], err = ds.DB.Prepare(selectSQL + " where id = $1")
-	stmts["SELIN"], err = ds.DB.Prepare(selectSQL + " where id in (select unnest(string_to_array($1, ',')::integer[]))")
-	stmts["DELID"], err = ds.DB.Prepare(deleteSQL + " where id = $1")
-	stmts["DELIN"], err = ds.DB.Prepare(deleteSQL + " where id in (select unnest(string_to_array($1, ',')::integer[]))")
+	// UPDATE
+	sqls["UPD"] = fmt.Sprintf("UPDATE %s SET data=$1, updated_at=NOW() WHERE id = $2", tableName)
 
-	ds.CollectionStmts[tableName] = stmts
+	// SELECT
+	sqls["SEL"] = fmt.Sprintf("SELECT * FROM %s", tableName)
+	sqls["SELID"] = fmt.Sprintf("SELECT * FROM %s where id = $1", tableName)
+	sqls["SELIN"] = fmt.Sprintf("SELECT * FROM %s where id in (select unnest(string_to_array($1, ',')::integer[]))", tableName)
+
+	// DELETE
+	sqls["DELID"] = fmt.Sprintf("DELETE FROM %s where id = $1", tableName)
+	sqls["DELIN"] = fmt.Sprintf("DELETE FROM %s where id in (select unnest(string_to_array($1, ',')::integer[]))", tableName)
+
+	for key, value := range sqls {
+		prepared[key], err = ds.DB.Prepare(value)
+		if err != nil {
+			return
+		}
+	}
+
+	ds.CollectionStmts[tableName] = prepared
 
 	return
 

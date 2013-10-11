@@ -1,4 +1,4 @@
-// test -bench=".*" ./tests
+// go test -bench=".*" ./tests
 package main
 
 import (
