@@ -33,7 +33,7 @@ func main() {
 
 	file, err := os.OpenFile("/Users/allochi/Downloads/Udacity Sheets/nhisdata.csv", os.O_RDONLY, 0666)
 	if err != nil {
-		panic("")
+		panic("File not found!")
 	}
 
 	// fileReader := bufio.NewReader(file)
