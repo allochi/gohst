@@ -29,7 +29,7 @@ func main() {
 	var bogs []Bog
 	for i := 0; i < 8; i++ {
 		var bog Bog
-		Contactizer.PUT(&bog)
+		Contactizer.Put(&bog)
 		bogs = append(bogs, bog)
 	}
 
@@ -41,8 +41,8 @@ func main() {
 
 	// Delete without return deleted objects
 	var bogs2Delete []Bog
-	err := Contactizer.DELETE(bogs2Delete, firstIds)
-	// err := Contactizer.DELETE(&bogs2Delete, firstIds)
+	err := Contactizer.Delete(bogs2Delete, firstIds)
+	// err := Contactizer.Delete(&bogs2Delete, firstIds)
 	if err != nil {
 		log.Printf("Error: %s", err)
 	}
@@ -50,7 +50,7 @@ func main() {
 
 	// Try to get them
 	var deletedBogs []Bog
-	Contactizer.GET(&deletedBogs, firstIds)
+	Contactizer.Get(&deletedBogs, firstIds)
 	log.Printf("Found %d of deleted bogs", len(deletedBogs))
 
 	spew.Dump(bogs2Delete)

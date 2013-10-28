@@ -20,7 +20,7 @@ func init() {
 	// Contactizer.CheckCollections = true
 	// gohst.Register("Contactizer", Contactizer)
 
-	var Contactizer gohst.DataStore
+	// var Contactizer gohst.DataStore
 	ContactizerJson := gohst.NewPostJson("allochi_contactizer", "allochi", "")
 	Contactizer.Register("Contactizer", ContactizerJson)
 	Contactizer.Connect()
@@ -29,7 +29,10 @@ func init() {
 
 func main() {
 
-	defer Contactizer.Disconnect()
+	ds, _ := gohst.GetDataStore("Contactizer")
+	fmt.Printf(">> ds <<\n%#v \n\n", ds)
+	fmt.Printf(">> Contactizer <<\n%#v \n\n", Contactizer)
+	defer ds.Disconnect()
 
 	// MailingListsList()
 	// SamplePostJSon()
@@ -51,7 +54,7 @@ func InsertAContact() {
 	// delete from json_contacts where id >= 2107;
 	// select setval('json_contacts_id_seq',2107);
 	// select * from json_contacts where id >= 2107;
-	err := Contactizer.PUT(contact)
+	err := Contactizer.Put(contact)
 	if err != nil {
 		log.Printf("Error: %s", err)
 	}
@@ -59,17 +62,17 @@ func InsertAContact() {
 
 func UpdateAContact() {
 	var contacts []Contact
-	Contactizer.GET(&contacts, []int64{1})
+	Contactizer.Get(&contacts, []int64{1})
 	contact := contacts[0]
 	// spew.Dump(contact)
-	Contactizer.PUT(contact)
+	Contactizer.Put(contact)
 }
 
 func ContactsOfMailingList() {
 
 	// Get the mailing list
 	var mailingLists []MailingList
-	err := Contactizer.GET(&mailingLists, []int64{14})
+	err := Contactizer.Get(&mailingLists, []int64{14})
 
 	if err != nil {
 		log.Fatalf("Error getting mailing list: %s", err)
@@ -77,7 +80,7 @@ func ContactsOfMailingList() {
 
 	// Get the contacts
 	var contacts []Contact
-	Contactizer.GET(&contacts, mailingLists[0].ContactIds)
+	Contactizer.Get(&contacts, mailingLists[0].ContactIds)
 
 	for _, contact := range contacts {
 		InterestOfContact(contact)
@@ -91,7 +94,7 @@ func ContactsOfMailingList() {
 func MailingListsList() {
 	var mailingLists []MailingList
 	recordIDs := []int64{1, 2, 3}
-	Contactizer.GET(&mailingLists, recordIDs)
+	Contactizer.Get(&mailingLists, recordIDs)
 	for _, mailingList := range mailingLists {
 		fmt.Printf("> %s (%d)\n", mailingList.Name, len(mailingList.ContactIds))
 	}
@@ -99,8 +102,8 @@ func MailingListsList() {
 
 func AllMailingLists() {
 	var mailingLists []MailingList
-	// err := Contactizer.GET(&mailingLists, []int64{4, 5, 6, 7, 8, 9})
-	err := Contactizer.GET(&mailingLists, []int64{})
+	// err := Contactizer.Get(&mailingLists, []int64{4, 5, 6, 7, 8, 9})
+	err := Contactizer.Get(&mailingLists, []int64{})
 	if err != nil {
 		log.Fatalf("... %s", err)
 	}
@@ -111,27 +114,29 @@ func AllMailingLists() {
 
 func AllContacts() {
 	var contacts []Contact
-	// err := Contactizer.GET(&contacts, []int64{4, 5, 6, 7, 8, 9})
-	// err := Contactizer.GET(&contacts, []int64{})
+	// err := Contactizer.Get(&contacts, []int64{4, 5, 6, 7, 8, 9})
+	// err := Contactizer.Get(&contacts, []int64{})
 	ds, err := gohst.GetDataStore("Contactizer")
 	if err != nil {
 		fmt.Errorf("err: %s", err)
 	}
-	err = ds.GET(&contacts, []int64{})
+	err = ds.Get(&contacts, []int64{})
 	if err != nil {
 		log.Fatalf("... %s", err)
 	}
-	for _, contact := range contacts {
-		// fmt.Printf("[%4d] %s \n", contact.Id, contact.Name())
-		fmt.Printf("%#v\n\n", contact)
-		fmt.Printf("%+v\n\n", contact)
-	}
+	fmt.Printf("There are %d contacts \n\n", len(contacts))
+	fmt.Printf("Contactizer = %#v \n\n", ds)
+	// for _, contact := range contacts {
+	// 	// fmt.Printf("[%4d] %s \n", contact.Id, contact.Name())
+	// 	// fmt.Printf("%#v\n\n", contact)
+	// 	// fmt.Printf("%+v\n\n", contact)
+	// }
 }
 
 func SamplePostJSon() {
 
 	var contacts []Contact
-	Contactizer.GET(&contacts, []int64{1, 2, 3, 4})
+	Contactizer.Get(&contacts, []int64{1, 2, 3, 4})
 	for _, contact := range contacts {
 		InterestOfContact(contact)
 	}
@@ -175,21 +180,21 @@ func InterestOfContact(contact Contact) {
 // 	// people = append(people, vanessa)
 
 // 	gohst.DataStore = People
-// 	fmt.Printf("Main (people b4PUT): %s\n", People)
-// 	response := gohst.PUT(allochi)
+// 	fmt.Printf("Main (people b4Put): %s\n", People)
+// 	response := gohst.Put(allochi)
 // 	fmt.Printf("%s\n", response.Message)
 // 	if response.Message == "OK" {
 // 		fmt.Printf("$v inserted", allochi)
 // 	}
-// 	if gohst.PUT(vanessa).Message == "OK" {
+// 	if gohst.Put(vanessa).Message == "OK" {
 // 		fmt.Printf("$v inserted", vanessa)
 // 	}
-// 	fmt.Printf("Main (people A8PUT): %s\n", People)
+// 	fmt.Printf("Main (people A8Put): %s\n", People)
 
 // 	gohst.DataStore = others
-// 	fmt.Printf("Main (others b4PUT): %s\n", others)
-// 	gohst.PUT(allochi)
-// 	fmt.Printf("Main (others A8PUT): %s\n", others)
+// 	fmt.Printf("Main (others b4Put): %s\n", others)
+// 	gohst.Put(allochi)
+// 	fmt.Printf("Main (others A8Put): %s\n", others)
 // }
 
 // // --------------------------------------------------------------------------------
@@ -199,7 +204,7 @@ func InterestOfContact(contact Contact) {
 
 // var People PeopleDataStore
 
-// func (ds PeopleDataStore) PUT(object interface{}) (response gohst.Response) {
+// func (ds PeopleDataStore) Put(object interface{}) (response gohst.Response) {
 // 	_object := reflect.ValueOf(object)
 // 	_people := reflect.Indirect(reflect.ValueOf(&People))
 // 	_people.Set(reflect.Append(_people, _object))
@@ -210,7 +215,7 @@ func InterestOfContact(contact Contact) {
 // 	return
 // }
 
-// func (ds PeopleDataStore) GET(interface{}, interface{}) (response gohst.Response) {
+// func (ds PeopleDataStore) Get(interface{}, interface{}) (response gohst.Response) {
 // 	return
 // }
 
@@ -218,7 +223,7 @@ func InterestOfContact(contact Contact) {
 
 // var others OthersDataStore
 
-// func (ds OthersDataStore) PUT(object interface{}) (response gohst.Response) {
+// func (ds OthersDataStore) Put(object interface{}) (response gohst.Response) {
 // 	_object := reflect.ValueOf(object)
 // 	_others := reflect.Indirect(reflect.ValueOf(&others))
 // 	_others.Set(reflect.Append(_others, _object))
@@ -229,6 +234,6 @@ func InterestOfContact(contact Contact) {
 // 	return
 // }
 
-// func (ds OthersDataStore) GET(interface{}, interface{}) (response gohst.Response) {
+// func (ds OthersDataStore) Get(interface{}, interface{}) (response gohst.Response) {
 // 	return
 // }

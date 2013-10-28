@@ -1,6 +1,6 @@
 -- create extension json_enhancements;
 
-DELETE FROM json_contacts;
+Delete FROM json_contacts;
 TRUNCATE TABLE json_contacts RESTART IDENTITY;
 
 DROP VIEW json_contacts_view;

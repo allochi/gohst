@@ -33,7 +33,7 @@ func main() {
 	var done1 bool
 	go func() {
 		log.Println("In {Go1}")
-		Contactizer.GET(&bogs1, ids)
+		Contactizer.Get(&bogs1, ids)
 		log.Printf("Go1: There were %d bogs", len(bogs1))
 		done1 = true
 	}()
@@ -42,7 +42,7 @@ func main() {
 	var done2 bool
 	go func() {
 		log.Println("In {Go2}")
-		Contactizer.GET(&bogs2, ids)
+		Contactizer.Get(&bogs2, ids)
 		log.Printf("Go2: There were %d bogs", len(bogs2))
 		done2 = true
 	}()

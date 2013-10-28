@@ -38,7 +38,7 @@ func main() {
 		bog.Tags = []string{"For", "example, based", "on", "experience, a", "candidate", "for", "an", "employee", "benefits", "management", "position", "might", "use", "the", "following", "resume", "keywords: employee", "benefit", "plans, CEBS, health", "care", "benefits, benefit", "policy, FMLA.A", "customer", "service", "representative", "could", "include: customer", "service, customer", "tracking", "system, computer", "skills, order", "entry", "experience."}
 		bog.Link = "http://jobsearch.about.com/od/resumewriting/ig/Sections-of-a-Resume-Examples/Resume-Keywords.htm"
 
-		err := Contactizer.PUT(&bog)
+		err := Contactizer.Put(&bog)
 		if err != nil {
 			log.Printf("Error: %s", err)
 		}
