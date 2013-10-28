@@ -13,11 +13,11 @@ var Contactizer gohst.DataStore
 
 func init() {
 
-	AllochiContactizer := gohst.NewPostJson("allochi_contactizer", "allochi", "")
-	Contactizer.Register("Contactizer", AllochiContactizer)
+	postgres := gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	gohst.Register("Contactizer", postgres)
+	Contactizer, _ = gohst.GetDataStore("Contactizer")
 	Contactizer.Connect()
 	// defer Contactizer.Disconnect()
-	// gohst.Register("Contactizer", Contactizer)
 }
 
 func TestReadData(t *testing.T) {
@@ -30,7 +30,7 @@ func TestReadData(t *testing.T) {
 
 	ids := []int64{4, 5, 6, 7, 8, 9}
 	expected = len(ids)
-	err = Contactizer.GET(&contacts, ids)
+	err = Contactizer.Get(&contacts, ids)
 
 	if err != nil {
 		t.Errorf("Database Error: %s", err)
@@ -44,7 +44,7 @@ func TestReadData(t *testing.T) {
 	var allContacts []Contact
 	db, err := sql.Open("postgres", "user=allochi dbname=allochi_contactizer sslmode=disable")
 	db.QueryRow("select count(*) from json_contacts;").Scan(&expected)
-	err = Contactizer.GET(&allContacts, []int64{})
+	err = Contactizer.Get(&allContacts, []int64{})
 	got = len(allContacts)
 	if got != expected {
 		t.Errorf("Get All: Expected %d contacts got %d", expected, got)
@@ -60,29 +60,29 @@ func TestInsertAndDelete(t *testing.T) {
 	bog.Link = "http://www.allochi.com"
 
 	// Return and ID
-	err := Contactizer.PUT(&bog)
+	err := Contactizer.Put(&bog)
 
 	if err != nil {
 		t.Fatalf("gohst error: %s", err)
 	}
 
 	if bog.Id <= 0 {
-		t.Errorf("PUT: Expected an ID > 0 got %d", bog.Id)
+		t.Errorf("Put: Expected an ID > 0 got %d", bog.Id)
 	}
 
 	ids := []int64{bog.Id}
 
-	err = Contactizer.DELETE([]Bog{}, ids)
+	err = Contactizer.Delete([]Bog{}, ids)
 
 	if err != nil {
 		t.Fatalf("gohst error: %s", err)
 	}
 
 	var bogs []Bog
-	err = Contactizer.GET(&bogs, ids)
+	err = Contactizer.Get(&bogs, ids)
 
 	if len(bogs) > 0 {
-		t.Errorf("DELETE: Didn't expect an object got %d", len(bogs))
+		t.Errorf("Delete: Didn't expect an object got %d", len(bogs))
 	}
 
 }
@@ -99,13 +99,9 @@ func TestInsertAndDelete(t *testing.T) {
 // ==========
 func BenchmarkReadData(b *testing.B) {
 
-	// b.StopTimer()
-
-	// b.StartTimer()
-
 	for i := 0; i < b.N; i++ {
 		var allContacts []Contact
-		err := Contactizer.GET(&allContacts, []int64{9})
+		err := Contactizer.Get(&allContacts, []int64{9})
 		if err != nil {
 			b.Fatalf("gohst error: %s", err)
 		}
