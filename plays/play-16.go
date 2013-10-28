@@ -1,9 +1,11 @@
 package main
 
 import (
+	"allochi/gohst"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	// "strings"
+	"reflect"
+	"strings"
 )
 
 type Entry struct {
@@ -13,6 +15,8 @@ type Entry struct {
 }
 
 func (e *Entry) Bake() string {
+
+	// == Work the field
 	field := e.field
 	switch field {
 	case "Id":
@@ -22,9 +26,30 @@ func (e *Entry) Bake() string {
 	case "UpdatedAt":
 		field = fmt.Sprintf("'%s'", field)
 	default:
-		field = fmt.Sprintf("data->>'%s'", field)
+		fields := strings.Split(field, ":")
+		if len(fields) > 1 {
+			field = fmt.Sprintf("(data->>'%s')::%s", fields[0], fields[1])
+		} else {
+			field = fmt.Sprintf("data->>'%s'", field)
+		}
 	}
-	return "..."
+
+	// == Work the value
+	value := ""
+	valuesKind := gohst.KindOf(e.values)
+	var values []string
+	if valuesKind == gohst.SliceOfPrimitive {
+		slice := reflect.ValueOf(e.values)
+		values = make([]string, slice.Len())
+		for i := 0; i < slice.Len(); i++ {
+			values[i] = fmt.Sprintf("%v", slice.Index(i).Interface())
+		}
+		value = "(" + strings.Join(values, ",") + ")"
+	} else {
+		// == TODO: Check for type to see if '' is necessary
+		value = fmt.Sprintf("'%v'", e.values)
+	}
+	return field + " " + e.operator + " " + value
 }
 
 type Requester interface {
@@ -67,7 +92,7 @@ func (rc *RequestChain) Bake() string {
 
 func main() {
 
-	e1 := Entry{"country_id", "IN", []int64{1, 2, 3, 4, 5}}
+	e1 := Entry{"country_id:int", "IN", []int64{1, 2, 3, 4, 5}}
 	e2 := Entry{"title", "LIKE", "Cheif %"}
 
 	rc := &RequestChain{}
