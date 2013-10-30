@@ -96,12 +96,6 @@ func (e *Entry) Bake() string {
 }
 
 type Requester interface {
-	// Where(Entry) *Requester
-	// And(Entry) *Requester
-	// Or(Entry) *Requester
-	// WhereGroup(Entry) *Requester
-	// AndGroup(Entry) *Requester
-	// OrGroup(Entry) *Requester
 	Bake() string
 }
 
@@ -161,7 +155,7 @@ func (rc *RequestChain) OrGroup(e Entry) *RequestChain {
 func (rc *RequestChain) Bake() string {
 	conditions := ""
 	for idx, op := range rc.operations {
-		conditions += fmt.Sprintf(" %s %s", op, rc.entries[idx].Bake())
+		conditions += fmt.Sprintf("%s %s", op, rc.entries[idx].Bake())
 	}
 
 	if rc.isGroupOpen {

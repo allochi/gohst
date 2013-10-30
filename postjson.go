@@ -188,29 +188,6 @@ func (ds *PostJsonDataStore) Get(object interface{}, request Requester) (err err
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
 
 	var rows *sql.Rows
-	// _ids := ids.([]int64)
-	// if len(_ids) > 1 {
-	// 	_idsStr := make([]string, len(_ids))
-	// 	for i, id := range _ids {
-	// 		_idsStr[i] = strconv.FormatInt(id, 10)
-	// 	}
-	// 	if sort == "" {
-	// 		rows, err = ds.CollectionStmts[tableName]["SELIN"].Query(strings.Join(_idsStr, ","))
-	// 	} else {
-	// 		sql := fmt.Sprintf("SELECT * FROM %s where id IN (SELECT unnest(string_to_array($1, ',')::integer[])) ORDER BY %s;", tableName, sort)
-	// 		rows, err = ds.DB.Query(sql, strings.Join(_idsStr, ","))
-	// 	}
-	// } else if len(_ids) == 1 {
-	// 	rows, err = ds.CollectionStmts[tableName]["SELID"].Query(_ids[0])
-	// } else {
-	// 	if sort == "" {
-	// 		rows, err = ds.CollectionStmts[tableName]["SEL"].Query()
-	// 	} else {
-	// 		sql := fmt.Sprintf("SELECT * FROM %s ORDER BY %s;", tableName, sort)
-	// 		rows, err = ds.DB.Query(sql)
-	// 	}
-	// }
-
 	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake())
 	fmt.Println(sql)
 	rows, err = ds.DB.Query(sql)
@@ -236,7 +213,7 @@ func (ds *PostJsonDataStore) Get(object interface{}, request Requester) (err err
 	return
 }
 
-func (ds *PostJsonDataStore) GetRaw(object interface{}, ids interface{}, sort string) (result string, err error) {
+func (ds *PostJsonDataStore) GetRaw(object interface{}, request Requester) (result string, err error) {
 
 	var _elem reflect.Value
 	_kind := KindOf(object)
@@ -251,28 +228,8 @@ func (ds *PostJsonDataStore) GetRaw(object interface{}, ids interface{}, sort st
 	_typeName := _type.Name()
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
 
-	_ids := ids.([]int64)
-	if len(_ids) > 1 {
-		_idsStr := make([]string, len(_ids))
-		for i, id := range _ids {
-			_idsStr[i] = strconv.FormatInt(id, 10)
-		}
-		if sort == "" {
-			err = ds.CollectionStmts[tableName]["SELINRAW"].QueryRow(strings.Join(_idsStr, ",")).Scan(&result)
-		} else {
-			sql := fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s WHERE id IN (SELECT unnest(string_to_array($1, ',')::integer[])) ORDER BY %s) row_data;", tableName, sort)
-			err = ds.DB.QueryRow(sql, strings.Join(_idsStr, ",")).Scan(&result)
-		}
-	} else if len(_ids) == 1 {
-		err = ds.CollectionStmts[tableName]["SELIDRAW"].QueryRow(_ids[0]).Scan(&result)
-	} else {
-		if sort == "" {
-			err = ds.CollectionStmts[tableName]["SELRAW"].QueryRow().Scan(&result)
-		} else {
-			sql := fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s ORDER BY %s) row_data;", tableName, sort)
-			err = ds.DB.QueryRow(sql).Scan(&result)
-		}
-	}
+	sql := fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s %s) row_data;", tableName, request.Bake())
+	err = ds.DB.QueryRow(sql).Scan(&result)
 
 	return
 }

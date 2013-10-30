@@ -29,12 +29,9 @@ func main() {
 	defer Contactizer.Disconnect()
 
 	// Contactizer.Get(&contacts, []int64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
-	err = Contactizer.Index(Contact{}, "country_id", "int")
-	if err != nil {
-		fmt.Printf("%s\n", err)
-	}
+	// createIndexOnCountryId(Contactizer)
 
-	timer := time.Now()
+	// timer := time.Now()
 	// rawContacts, err := Contactizer.ExecuteRaw("empty_names()")
 	// rawContacts, err := Contactizer.GetRaw(Contact{}, []int64{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
 	// rawContacts, err := Contactizer.GetRaw(Contact{}, []int64{9, 1, 8, 2, 6, 3, 7, 5}, "")
@@ -46,7 +43,7 @@ func main() {
 	// Query in 0.014067022s
 	// Contactizer.GetRaw(Contact{}, []int64{}, "")
 
-	var contacts []Contact
+	// var contacts []Contact
 	// Contactizer.Execute(&contacts, "empty_names()")
 	// Contactizer.Get(&contacts, []int64{9, 1, 8, 2, 6, 3, 7, 5}, "(data->>'country_id')::int DESC")
 
@@ -54,6 +51,37 @@ func main() {
 	// 988 row -> 6,330 obj/s
 	// Contactizer.Get(&contacts, []int64{}, "(data->>'country_id')::int DESC")
 
+	// withGo(Contactizer)
+
+	raw(Contactizer)
+
+}
+
+func raw(Contactizer gohst.DataStore) {
+	fmt.Println("Running raw()")
+	// == no index no prepared:
+	// == Query in 0.038814292s, 971883 chars were retrieved (17")
+
+	// == index no prepared:
+	// == Query in 0.036462497s, 971883 chars were retrieved (17")
+
+	// createIndexOnTitleId(Contactizer)
+
+	timer := time.Now()
+	request := &gohst.RequestChain{}
+	request.Where(gohst.Entry{"country_id:int", ">", 20})
+	result, err := Contactizer.GetRaw(Contact{}, request)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	duration := time.Since(timer).Nanoseconds()
+	fmt.Printf("Query in %vs, %d chars were retrieved\n", float64(duration)/float64(1000000000), len(result))
+}
+
+func objects(Contactizer gohst.DataStore) {
+	var contacts []Contact
+	timer := time.Now()
 	// Query in 0.146086243s using empty request to grap all 988 record
 	// Query in 0.00228221s for 8 objects (3.5k objs aprox.)
 	request := &gohst.RequestChain{}
@@ -65,19 +93,25 @@ func main() {
 	duration := time.Since(timer).Nanoseconds()
 
 	fmt.Printf("%d Contacts in %vs\n", len(contacts), float64(duration)/float64(1000000000))
-	for _, contact := range contacts {
-		fmt.Printf("%d", contact.Id)
-	}
-	fmt.Println()
-
-	// fmt.Printf("%s\n\n in %vs\n", rawContacts, float64(duration)/float64(1000000000))
 	fmt.Printf("Query in %vs\n", float64(duration)/float64(1000000000))
-
-	withGo(Contactizer)
 
 }
 
-func withGo(Contactizer gohst.DataStore) {
+func createIndexOnCountryId(Contactizer gohst.DataStore) {
+	err := Contactizer.Index(Contact{}, "country_id", "int")
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
+}
+
+func createIndexOnTitleId(Contactizer gohst.DataStore) {
+	err := Contactizer.Index(Contact{}, "title_id", "int")
+	if err != nil {
+		fmt.Printf("%s\n", err)
+	}
+}
+
+func goroutines(Contactizer gohst.DataStore) {
 	doneCount := 0
 
 	go func() {

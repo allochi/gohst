@@ -17,10 +17,10 @@ type DataStoreContainer interface {
 	Disconnect() error
 	Put(interface{}) error
 	Get(interface{}, Requester) error
+	GetRaw(interface{}, Requester) (string, error)
 	Delete(interface{}, interface{}) error
 	Index(interface{}, string, string) error
 	Execute(interface{}, string) error
-	GetRaw(interface{}, interface{}, string) (string, error)
 	ExecuteRaw(string) (string, error)
 }
 
@@ -89,28 +89,18 @@ func (ds *DataStore) Get(object interface{}, request Requester) error {
 		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
 	}
 
-	// _idsKind := KindOf(ids)
-	// if _idsKind != SliceOfPrimitive {
-	// 	return fmt.Errorf("gohst.Get() accepts slice of a primitive type as ids e.g int64 or string")
-	// }
-
 	return ds.container.Get(object, request)
 }
 
 // Works just like Get() but returns a JSON array in a string instead of objects array.
-func (ds *DataStore) GetRaw(object interface{}, ids interface{}, sort string) (string, error) {
+func (ds *DataStore) GetRaw(object interface{}, request Requester) (string, error) {
 
 	_kind := KindOf(object)
 	if _kind != Struct && _kind != Pointer2Struct {
 		return "", fmt.Errorf("gohst.GetRaw() only accepts an object or a pointer to an object of type struct")
 	}
 
-	_idsKind := KindOf(ids)
-	if _idsKind != SliceOfPrimitive {
-		return "", fmt.Errorf("gohst.GetRaw() accepts slice of a primitive type as ids e.g int64 or string")
-	}
-
-	return ds.container.GetRaw(object, ids, sort)
+	return ds.container.GetRaw(object, request)
 }
 
 // Execute a procedure in the database and return an array of objects, the array is of the same type
