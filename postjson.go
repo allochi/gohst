@@ -360,3 +360,38 @@ func (ds *PostJsonDataStore) ExecuteRaw(procedure string) (result string, err er
 	err = ds.DB.QueryRow(sql).Scan(&result)
 	return
 }
+
+func (ds *PostJsonDataStore) Prepare(name string, object interface{}, request Requester) error {
+
+	if ds.CollectionStmts[tableName][name] != nil {
+		return fmt.Errorf("gohst.Prepare requires a name")
+	}
+
+	var _elem reflect.Value
+	_kind := KindOf(object)
+	switch _kind {
+	case Struct:
+		_elem = reflect.ValueOf(object)
+	case Pointer2Struct:
+		_elem = reflect.Indirect(reflect.ValueOf(object))
+	}
+
+	_type := _elem.Type()
+	_typeName := _type.Name()
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
+
+	// INSERT
+	// SELECT
+	// == No need to check on $1 since not all prepared statements need it!
+	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake())
+	prepared, err := ds.DB.Prepare(sql)
+	if err != nil {
+		fmt.Printf("gohst.PostJson.Prepare: %s\nQuery: %s", err, sql)
+	}
+	ds.CollectionStmts[tableName][name] = prepared
+
+	// DELETE
+
+	return nil
+
+}

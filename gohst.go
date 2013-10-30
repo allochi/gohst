@@ -20,6 +20,7 @@ type DataStoreContainer interface {
 	GetRaw(interface{}, Requester) (string, error)
 	Delete(interface{}, interface{}) error
 	Index(interface{}, string, string) error
+	Prepare(string, interface{}, Requester) error
 	Execute(interface{}, string) error
 	ExecuteRaw(string) (string, error)
 }
@@ -179,4 +180,19 @@ func (ds *DataStore) Index(object interface{}, field string, indexSqlType string
 	}
 
 	return ds.container.Index(object, field, indexSqlType)
+}
+
+func (ds *DataStore) Prepare(name string, object interface{}, request Requester) error {
+
+	if name == "" {
+		return fmt.Errorf("gohst.Prepare requires a name")
+	}
+
+	_kind := KindOf(object)
+	if _kind != Struct && _kind != Pointer2Struct {
+		return fmt.Errorf("gohst.Prepare() accepts only an object or a pointer to an object of type struct")
+	}
+
+	return ds.container.Prepare(name, object, request)
+
 }

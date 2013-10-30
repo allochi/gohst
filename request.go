@@ -99,6 +99,16 @@ type Requester interface {
 	Bake() string
 }
 
+// == Prepared Statement Caller
+type PreparedStatement struct {
+	name string
+}
+
+func (ps *PreparedStatement) Bake() string {
+	return ps.name
+}
+
+// == SQL Request Builder
 type RequestChain struct {
 	entries     []Entry
 	operations  []string

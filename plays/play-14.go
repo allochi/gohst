@@ -89,6 +89,9 @@ func objects(Contactizer gohst.DataStore) {
 	// request.Where(gohst.Entry{"Id", "IN", []int64{9, 1, 8, 2, 6, 3, 7, 5}})
 	Contactizer.Get(&contacts, request)
 
+	gohst.Prepare("SELECTALL", Contact{}, request)
+	gohst.ExecutePrepared("SELECTALL", &Contacts, 1, 2, 3, 4)
+
 	// Contactizer.Get(&contacts, []int64{}, "")
 	duration := time.Since(timer).Nanoseconds()
 
