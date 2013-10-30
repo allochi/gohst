@@ -19,12 +19,11 @@ func (e *Entry) Bake() string {
 	field := e.Field
 	switch field {
 	case "Id":
-		fallthrough
+		field = "id"
 	case "CreatedAt":
-		fallthrough
+		field = "created_at"
 	case "UpdatedAt":
-		// == Direct fields don't need "data->>'...'"
-		field = fmt.Sprintf("'%s'", field)
+		field = "updated_at"
 	default:
 		fields := strings.Split(field, ":")
 		if len(fields) > 1 {
@@ -97,12 +96,12 @@ func (e *Entry) Bake() string {
 }
 
 type Requester interface {
-	Where(Entry) *Requester
-	And(Entry) *Requester
-	Or(Entry) *Requester
-	WhereGroup(Entry) *Requester
-	AndGroup(Entry) *Requester
-	OrGroup(Entry) *Requester
+	// Where(Entry) *Requester
+	// And(Entry) *Requester
+	// Or(Entry) *Requester
+	// WhereGroup(Entry) *Requester
+	// AndGroup(Entry) *Requester
+	// OrGroup(Entry) *Requester
 	Bake() string
 }
 

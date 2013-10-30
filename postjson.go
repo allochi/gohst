@@ -179,7 +179,7 @@ func (ds *PostJsonDataStore) Put(object interface{}) error {
 	return err
 }
 
-func (ds *PostJsonDataStore) Get(object interface{}, ids interface{}, sort string) (err error) {
+func (ds *PostJsonDataStore) Get(object interface{}, request Requester) (err error) {
 
 	_slice := reflect.Indirect(reflect.ValueOf(object))
 	_type := reflect.TypeOf(object).Elem().Elem()
@@ -188,28 +188,32 @@ func (ds *PostJsonDataStore) Get(object interface{}, ids interface{}, sort strin
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
 
 	var rows *sql.Rows
-	_ids := ids.([]int64)
-	if len(_ids) > 1 {
-		_idsStr := make([]string, len(_ids))
-		for i, id := range _ids {
-			_idsStr[i] = strconv.FormatInt(id, 10)
-		}
-		if sort == "" {
-			rows, err = ds.CollectionStmts[tableName]["SELIN"].Query(strings.Join(_idsStr, ","))
-		} else {
-			sql := fmt.Sprintf("SELECT * FROM %s where id IN (SELECT unnest(string_to_array($1, ',')::integer[])) ORDER BY %s;", tableName, sort)
-			rows, err = ds.DB.Query(sql, strings.Join(_idsStr, ","))
-		}
-	} else if len(_ids) == 1 {
-		rows, err = ds.CollectionStmts[tableName]["SELID"].Query(_ids[0])
-	} else {
-		if sort == "" {
-			rows, err = ds.CollectionStmts[tableName]["SEL"].Query()
-		} else {
-			sql := fmt.Sprintf("SELECT * FROM %s ORDER BY %s;", tableName, sort)
-			rows, err = ds.DB.Query(sql)
-		}
-	}
+	// _ids := ids.([]int64)
+	// if len(_ids) > 1 {
+	// 	_idsStr := make([]string, len(_ids))
+	// 	for i, id := range _ids {
+	// 		_idsStr[i] = strconv.FormatInt(id, 10)
+	// 	}
+	// 	if sort == "" {
+	// 		rows, err = ds.CollectionStmts[tableName]["SELIN"].Query(strings.Join(_idsStr, ","))
+	// 	} else {
+	// 		sql := fmt.Sprintf("SELECT * FROM %s where id IN (SELECT unnest(string_to_array($1, ',')::integer[])) ORDER BY %s;", tableName, sort)
+	// 		rows, err = ds.DB.Query(sql, strings.Join(_idsStr, ","))
+	// 	}
+	// } else if len(_ids) == 1 {
+	// 	rows, err = ds.CollectionStmts[tableName]["SELID"].Query(_ids[0])
+	// } else {
+	// 	if sort == "" {
+	// 		rows, err = ds.CollectionStmts[tableName]["SEL"].Query()
+	// 	} else {
+	// 		sql := fmt.Sprintf("SELECT * FROM %s ORDER BY %s;", tableName, sort)
+	// 		rows, err = ds.DB.Query(sql)
+	// 	}
+	// }
+
+	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake())
+	fmt.Println(sql)
+	rows, err = ds.DB.Query(sql)
 
 	if err != nil {
 		return
@@ -278,7 +282,10 @@ func (ds *PostJsonDataStore) Delete(object interface{}, ids interface{}) (err er
 	_objectKind := KindOf(object)
 	_type := reflect.TypeOf(object).Elem()
 	if _objectKind == Pointer2SliceOfStruct {
-		ds.Get(object, ids, "")
+		request := &RequestChain{}
+		request.Where(Entry{"Id", "IN", ids.(int64)})
+		// ds.Get(object, ids, "")
+		// ds.Get(object, request)
 		_type = reflect.TypeOf(object).Elem().Elem()
 	}
 

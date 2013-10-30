@@ -16,7 +16,7 @@ type DataStoreContainer interface {
 	Connect() error
 	Disconnect() error
 	Put(interface{}) error
-	Get(interface{}, interface{}, string) error
+	Get(interface{}, Requester) error
 	Delete(interface{}, interface{}) error
 	Index(interface{}, string, string) error
 	Execute(interface{}, string) error
@@ -82,19 +82,19 @@ func (ds *DataStore) Put(object interface{}) error {
 // with another array of IDs, the function uses the try of the slice and fill the slice with
 // retrieved objects, if the slice is not empty it will be appended. If the IDs slice is empty
 // all object in the table will be retrieved. This function doesn't check for duplicates.
-func (ds *DataStore) Get(object interface{}, ids interface{}, sort string) error {
+func (ds *DataStore) Get(object interface{}, request Requester) error {
 
 	_objectKind := KindOf(object)
 	if _objectKind != Pointer2SliceOfStruct {
 		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
 	}
 
-	_idsKind := KindOf(ids)
-	if _idsKind != SliceOfPrimitive {
-		return fmt.Errorf("gohst.Get() accepts slice of a primitive type as ids e.g int64 or string")
-	}
+	// _idsKind := KindOf(ids)
+	// if _idsKind != SliceOfPrimitive {
+	// 	return fmt.Errorf("gohst.Get() accepts slice of a primitive type as ids e.g int64 or string")
+	// }
 
-	return ds.container.Get(object, ids, sort)
+	return ds.container.Get(object, request)
 }
 
 // Works just like Get() but returns a JSON array in a string instead of objects array.
