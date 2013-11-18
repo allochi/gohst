@@ -53,3 +53,37 @@ func BenchmarkReadData(b *testing.B) {
 	}
 
 }
+
+func BenchmarkGetAll(b *testing.B) {
+
+	Contactizer, _ := gohst.GetDataStore("Contactizer")
+
+	for i := 0; i < b.N; i++ {
+		var allContacts []Contact
+		// BenchmarkGetAll	      20	 118348888 ns/op (17")
+		err := Contactizer.GetAll(&allContacts)
+		if err != nil {
+			b.Fatalf("gohst error: %s", err)
+		}
+	}
+
+}
+
+func BenchmarkGetByArray(b *testing.B) {
+
+	Contactizer, _ := gohst.GetDataStore("Contactizer")
+
+	request := &gohst.RequestChain{}
+	request.Where(gohst.Clause{"categories", "@>", "$1"})
+	Contactizer.Prepare("SelectByCategory", Contact{}, request)
+
+	for i := 0; i < b.N; i++ {
+		var contacts []Contact
+		// BenchmarkGetByArray	      50	  29549293 ns/op (17", about 338 times a second)
+		err := Contactizer.ExecutePrepared("SelectByCategory", &contacts, "{Governments, Donors}")
+		if err != nil {
+			b.Fatalf("gohst error: %s", err)
+		}
+	}
+
+}
