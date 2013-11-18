@@ -23,11 +23,11 @@ func main() {
 		Person{12, "Hujjah"},
 	}
 
-	e1 := gohst.Entry{"country_id:int", "IN", []int64{56, 79, 28, 90, 10}}
-	e2 := gohst.Entry{"title", "LIKE", "Cheif %"}
-	e3 := gohst.Entry{"colors:text", "IN", []string{"Red", "Green", "Blue"}}
-	e4 := gohst.Entry{"days:datetime", "IN", []time.Time{time.Now(), time.Now().AddDate(-1, 0, 0)}}
-	e5 := gohst.Entry{"Imam", "IN", imams}
+	e1 := gohst.Clause{"country_id:int", "IN", []int64{56, 79, 28, 90, 10}}
+	e2 := gohst.Clause{"title", "LIKE", "Cheif %"}
+	e3 := gohst.Clause{"colors:text", "IN", []string{"Red", "Green", "Blue"}}
+	e4 := gohst.Clause{"days:datetime", "IN", []time.Time{time.Now(), time.Now().AddDate(-1, 0, 0)}}
+	e5 := gohst.Clause{"Imam", "IN", imams}
 
 	rc := &gohst.RequestChain{}
 	// rc.Where(e1).And(e2).And(e3)
@@ -47,7 +47,7 @@ func main() {
 	fmt.Printf("%s\n\n", rc2.Bake())
 
 	contactsRQ := &gohst.RequestChain{}
-	contactsRQ.Where(gohst.Entry{"country_id:int", "=", 20}).And(gohst.Entry{"title_id:int", "=", 4}).And(gohst.Entry{"telephone", "=", ""})
+	contactsRQ.Where(gohst.Clause{"country_id:int", "=", 20}).And(gohst.Clause{"title_id:int", "=", 4}).And(gohst.Clause{"telephone", "=", ""})
 	fmt.Printf("%s\n\n", contactsRQ.Bake())
 
 	// fmt.Println(rc.Bake())

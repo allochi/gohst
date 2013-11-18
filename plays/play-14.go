@@ -53,7 +53,10 @@ func main() {
 
 	// withGo(Contactizer)
 
-	raw(Contactizer)
+	// raw(Contactizer)
+	// objects(Contactizer)
+	// preparedObjects(Contactizer)
+	preparedArrayFind(Contactizer)
 
 }
 
@@ -69,7 +72,7 @@ func raw(Contactizer gohst.DataStore) {
 
 	timer := time.Now()
 	request := &gohst.RequestChain{}
-	request.Where(gohst.Entry{"country_id:int", ">", 20})
+	request.Where(gohst.Clause{"country_id:int", ">", 20})
 	result, err := Contactizer.GetRaw(Contact{}, request)
 	if err != nil {
 		fmt.Println(err)
@@ -85,14 +88,51 @@ func objects(Contactizer gohst.DataStore) {
 	// Query in 0.146086243s using empty request to grap all 988 record
 	// Query in 0.00228221s for 8 objects (3.5k objs aprox.)
 	request := &gohst.RequestChain{}
-	request.Where(gohst.Entry{"country_id:int", ">", 20})
-	// request.Where(gohst.Entry{"Id", "IN", []int64{9, 1, 8, 2, 6, 3, 7, 5}})
+	request.Where(gohst.Clause{"country_id:int", ">", 20})
+	// request.Where(gohst.Clause{"Id", "IN", []int64{9, 1, 8, 2, 6, 3, 7, 5}})
 	Contactizer.Get(&contacts, request)
 
-	gohst.Prepare("SELECTALL", Contact{}, request)
-	gohst.ExecutePrepared("SELECTALL", &Contacts, 1, 2, 3, 4)
-
 	// Contactizer.Get(&contacts, []int64{}, "")
+	duration := time.Since(timer).Nanoseconds()
+
+	fmt.Printf("%d Contacts in %vs\n", len(contacts), float64(duration)/float64(1000000000))
+	fmt.Printf("Query in %vs\n", float64(duration)/float64(1000000000))
+
+}
+
+func preparedObjects(Contactizer gohst.DataStore) {
+	var contacts []Contact
+
+	request := &gohst.RequestChain{}
+	request.Where(gohst.Clause{"country_id:int", ">", "$1"})
+	Contactizer.Prepare("SelectByCountryId", Contact{}, request)
+
+	timer := time.Now()
+	// 891 Contacts in 0.12906126s
+	err := Contactizer.ExecutePrepared("SelectByCountryId", &contacts, 20)
+	if err != nil {
+		fmt.Println(err)
+	}
+	duration := time.Since(timer).Nanoseconds()
+
+	fmt.Printf("%d Contacts in %vs\n", len(contacts), float64(duration)/float64(1000000000))
+	fmt.Printf("Query in %vs\n", float64(duration)/float64(1000000000))
+
+}
+
+func preparedArrayFind(Contactizer gohst.DataStore) {
+	var contacts []Contact
+
+	request := &gohst.RequestChain{}
+	request.Where(gohst.Clause{"categories:text[]", "@>", "$1"})
+	Contactizer.Prepare("SelectByCategory", Contact{}, request)
+
+	timer := time.Now()
+	// 891 Contacts in 0.12906126s
+	err := Contactizer.ExecutePrepared("SelectByCategory", &contacts, "{Governments, Donors}")
+	if err != nil {
+		fmt.Println(err)
+	}
 	duration := time.Since(timer).Nanoseconds()
 
 	fmt.Printf("%d Contacts in %vs\n", len(contacts), float64(duration)/float64(1000000000))
@@ -121,7 +161,7 @@ func goroutines(Contactizer gohst.DataStore) {
 		timer := time.Now()
 		var contacts []Contact
 		request := &gohst.RequestChain{}
-		request.Where(gohst.Entry{"Id", "IN", []int64{9, 1, 8, 2, 6, 3, 7, 5}})
+		request.Where(gohst.Clause{"Id", "IN", []int64{9, 1, 8, 2, 6, 3, 7, 5}})
 		Contactizer.Get(&contacts, request)
 		duration := time.Since(timer).Nanoseconds()
 		fmt.Printf("%d Contacts in %vs\n", len(contacts), float64(duration)/float64(1000000000))
@@ -136,7 +176,7 @@ func goroutines(Contactizer gohst.DataStore) {
 		timer := time.Now()
 		var contacts []Contact
 		request := &gohst.RequestChain{}
-		request.Where(gohst.Entry{"country_id:int", ">", 20})
+		request.Where(gohst.Clause{"country_id:int", ">", 20})
 		Contactizer.Get(&contacts, request)
 		duration := time.Since(timer).Nanoseconds()
 		fmt.Printf("%d Contacts in %vs\n", len(contacts), float64(duration)/float64(1000000000))

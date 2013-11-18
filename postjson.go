@@ -1,14 +1,13 @@
 package gohst
 
 import (
-	"allochi/inflect"
+	"bitbucket.org/pkg/inflect"
 	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	_ "github.com/lib/pq"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -115,44 +114,33 @@ func (ds *PostJsonDataStore) createCollection(name string) error {
 	return nil
 }
 
+// Put insert or update an object to the database
+// If the object's Id == 0 then INSERT is used to insert a new object
+// If a pointer to object is passed and Id == 0 then the Id will be updated from the database
+// If Id != 0 then UPDATE is used and the object is updated
 func (ds *PostJsonDataStore) Put(object interface{}) error {
 
-	// Check type of object & get the name of collection ------------------------------
-	var _elem reflect.Value
-	_kind := KindOf(object)
-	switch _kind {
-	case Struct:
-		_elem = reflect.ValueOf(object)
-	case Pointer2Struct:
-		_elem = reflect.Indirect(reflect.ValueOf(object))
-	}
+	_name, _, _value := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
 
 	record := Record{}
-	_type := _elem.Type()
-	_typeName := _type.Name()
-	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
-
-	// ID -----------------------------------------------------------------------------
-	record.Id = _elem.FieldByName("Id").Int()
-
-	// Data ---------------------------------------------------------------------------
+	record.Id = _value.FieldByName("Id").Int()
 	data, err := json.Marshal(object)
 	if err != nil {
 		return err
 	}
 	record.Data = bytes.Replace(data, sqoute, sqouteESC, -1)
 
-	// Time Stamps --------------------------------------------------------------------
+	record.CreatedAt = _value.FieldByName("CreatedAt").Interface().(time.Time)
+	record.UpdatedAt = _value.FieldByName("UpdatedAt").Interface().(time.Time)
 
-	record.CreatedAt = _elem.FieldByName("CreatedAt").Interface().(time.Time)
-	record.UpdatedAt = _elem.FieldByName("UpdatedAt").Interface().(time.Time)
-
-	// Check & Create Collections -----------------------------------------------------
+	// Check & Create Collections
+	// If you are sure that the table exist then CheckCollections can be set to false for performance
 
 	if ds.CheckCollections {
 		exist, err := ds.collectionExists(tableName)
 		if err != nil {
-			return fmt.Errorf("Couldn't check for data store collection \"%s\" - %s", err)
+			return fmt.Errorf("Couldn't check for data store collection \"%s\" exists - %s", err)
 		}
 		if !exist && err == nil {
 			if ds.AutoCreateCollections {
@@ -163,104 +151,149 @@ func (ds *PostJsonDataStore) Put(object interface{}) error {
 		}
 	}
 
-	// Write to database --------------------------------------------------------------
+	// Write to database
+	// If Id == 0 it's a new object then use INSERT otherwise use UPDATE
+	// If pointer to object is passed then update the Id
 
 	if record.Id == 0 {
-		if _kind == Pointer2Struct {
-			ds.CollectionStmts[tableName]["INSID"].QueryRow(record.Data).Scan(&record.Id)
-			_elem.FieldByName("Id").SetInt(record.Id)
+		if KindOf(object) == Pointer2Struct {
+			err = ds.CollectionStmts[tableName]["INSID"].QueryRow(record.Data).Scan(&record.Id)
+			if err != nil {
+				return err
+			}
+			_value.FieldByName("Id").SetInt(record.Id)
 		} else {
-			ds.CollectionStmts[tableName]["INS"].Exec(record.Data)
+			_, err = ds.CollectionStmts[tableName]["INS"].Exec(record.Data)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
-		ds.CollectionStmts[tableName]["UPD"].Exec(record.Data, record.Id)
+		_, err = ds.CollectionStmts[tableName]["UPD"].Exec(record.Data, record.Id)
+		if err != nil {
+			return err
+		}
 	}
 
 	return err
 }
 
-func (ds *PostJsonDataStore) Get(object interface{}, request Requester) (err error) {
+// Returns an an array of objects based on list of ids
+// This should be faster than normal Get, since it search by IDs and uses prepared statement
+func (ds *PostJsonDataStore) GetById(object interface{}, ids []int64) (err error) {
 
-	_slice := reflect.Indirect(reflect.ValueOf(object))
-	_type := reflect.TypeOf(object).Elem().Elem()
-
-	_typeName := _type.Name()
-	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
+	_name, _type, _value := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
 
 	var rows *sql.Rows
-	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake())
-	fmt.Println(sql)
+	switch {
+	case len(ids) == 0:
+		rows, err = ds.CollectionStmts[tableName]["SELALL"].Query()
+	case len(ids) == 1:
+		rows, err = ds.CollectionStmts[tableName]["SELID"].Query(ids[0])
+		// rows, err = ds.DB.Query(fmt.Sprintf("SELECT * FROM %s where id = $1;", tableName), ids[0])
+	case len(ids) > 1:
+		rows, err = ds.CollectionStmts[tableName]["SELIN"].Query(Ints2String(ids))
+	}
+
+	if err != nil {
+		return
+	}
+
+	defer rows.Close()
+
+	unpackRows(rows, _type, _value)
+
+	return
+
+}
+
+// Returns an an array of objects based on list of ids
+// This should be faster than normal Get, since it search by IDs and uses prepared statement
+func (ds *PostJsonDataStore) GetRawById(object interface{}, ids []int64) (result string, err error) {
+
+	_name, _, _ := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
+
+	switch {
+	case len(ids) == 0:
+		err = ds.CollectionStmts[tableName]["SELALLRAW"].QueryRow().Scan(&result)
+	case len(ids) == 1:
+		err = ds.CollectionStmts[tableName]["SELIDRAW"].QueryRow(ids[0]).Scan(&result)
+	case len(ids) > 1:
+		err = ds.CollectionStmts[tableName]["SELINRAW"].QueryRow(Ints2String(ids)).Scan(&result)
+	}
+
+	return
+
+}
+
+// Returns an an array of objects based on a request
+func (ds *PostJsonDataStore) Get(object interface{}, request Requester) (err error) {
+
+	_name, _type, _value := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
+
+	var rows *sql.Rows
+	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake(object))
 	rows, err = ds.DB.Query(sql)
 
 	if err != nil {
 		return
 	}
+
 	defer rows.Close()
 
-	for rows.Next() {
-		var record Record
-		_object := reflect.New(_type)
-
-		rows.Scan(&record.Id, &record.Data, &record.CreatedAt, &record.UpdatedAt)
-
-		_object.Elem().FieldByName("Id").SetInt(record.Id)
-		_object.Elem().FieldByName("CreatedAt").Set(reflect.ValueOf(record.CreatedAt))
-		_object.Elem().FieldByName("UpdatedAt").Set(reflect.ValueOf(record.UpdatedAt))
-		json.Unmarshal(record.Data, _object.Interface())
-		_slice.Set(reflect.Append(_slice, _object.Elem()))
-	}
+	unpackRows(rows, _type, _value)
 
 	return
+
 }
 
+// Returns the result as a json in a string instead of unpacking it into an array of objects
 func (ds *PostJsonDataStore) GetRaw(object interface{}, request Requester) (result string, err error) {
 
-	var _elem reflect.Value
-	_kind := KindOf(object)
-	switch _kind {
-	case Struct:
-		_elem = reflect.ValueOf(object)
-	case Pointer2Struct:
-		_elem = reflect.Indirect(reflect.ValueOf(object))
-	}
+	_name, _, _ := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
 
-	_type := _elem.Type()
-	_typeName := _type.Name()
-	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
-
-	sql := fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s %s) row_data;", tableName, request.Bake())
+	sql := fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s %s) row_data;", tableName, request.Bake(object))
 	err = ds.DB.QueryRow(sql).Scan(&result)
 
 	return
+
 }
 
-func (ds *PostJsonDataStore) Delete(object interface{}, ids interface{}) (err error) {
+// Delete the objects from the table based on the request
+// This should be faster than normal Delete, since it search by IDs and uses prepared statement
+func (ds *PostJsonDataStore) DeleteById(object interface{}, ids []int64) (err error) {
 
-	_objectKind := KindOf(object)
-	_type := reflect.TypeOf(object).Elem()
-	if _objectKind == Pointer2SliceOfStruct {
-		request := &RequestChain{}
-		request.Where(Entry{"Id", "IN", ids.(int64)})
-		// ds.Get(object, ids, "")
-		// ds.Get(object, request)
-		_type = reflect.TypeOf(object).Elem().Elem()
-	}
+	_name, _, _ := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
 
-	_typeName := _type.Name()
-	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
-
-	_ids := ids.([]int64)
-	if len(_ids) > 1 {
-		_idsStr := make([]string, len(_ids))
-		for i, id := range _ids {
-			_idsStr[i] = strconv.FormatInt(id, 10)
-		}
-		_, err = ds.CollectionStmts[tableName]["DELIN"].Exec(strings.Join(_idsStr, ","))
-	} else if len(_ids) == 1 {
-		_, err = ds.CollectionStmts[tableName]["DELID"].Exec(_ids[0])
+	switch {
+	case len(ids) == 0:
+		err = fmt.Errorf("Delete can't have empty id list")
+	case len(ids) == 1:
+		_, err = ds.CollectionStmts[tableName]["DELID"].Exec(ids[0])
+	case len(ids) > 1:
+		_, err = ds.CollectionStmts[tableName]["DELIN"].Exec(ids)
 	}
 
 	return
+
+}
+
+// Delete the objects from the table based on the request
+func (ds *PostJsonDataStore) Delete(object interface{}, request Requester) (err error) {
+
+	_name, _, _ := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
+
+	sql := fmt.Sprintf("DELETE FROM %s %s", tableName, request.Bake(object))
+	_, err = ds.DB.Exec(sql)
+
+	return
+
 }
 
 func (ds *PostJsonDataStore) prepareStatements(tableName string) (err error) {
@@ -275,17 +308,17 @@ func (ds *PostJsonDataStore) prepareStatements(tableName string) (err error) {
 	// UPDATE
 	sqls["UPD"] = fmt.Sprintf("UPDATE %s SET data=$1, updated_at=NOW() WHERE id = $2;", tableName)
 
-	// SELECT
-	sqls["SEL"] = fmt.Sprintf("SELECT * FROM %s;", tableName)
+	// SELECT for GetById
+	sqls["SELALL"] = fmt.Sprintf("SELECT * FROM %s;", tableName)
 	sqls["SELID"] = fmt.Sprintf("SELECT * FROM %s where id = $1;", tableName)
 	sqls["SELIN"] = fmt.Sprintf("SELECT * FROM %s where id IN (SELECT unnest(string_to_array($1, ',')::integer[]));", tableName)
 
-	// SELECT RAW JSON
+	// SELECT RAW JSON for GetRawById
 	sqls["SELRAW"] = fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s) row_data;", tableName)
 	sqls["SELIDRAW"] = fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s WHERE id = $1) row_data;", tableName)
 	sqls["SELINRAW"] = fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s WHERE id IN (SELECT unnest(string_to_array($1, ',')::integer[])) ) row_data;", tableName)
 
-	// DELETE
+	// DELETE for DeleteById
 	sqls["DELID"] = fmt.Sprintf("DELETE FROM %s where id = $1;", tableName)
 	sqls["DELIN"] = fmt.Sprintf("DELETE FROM %s where id in (select unnest(string_to_array($1, ',')::integer[]));", tableName)
 
@@ -302,32 +335,49 @@ func (ds *PostJsonDataStore) prepareStatements(tableName string) (err error) {
 
 }
 
-// Using index helped to reduce query time to 4.7%
-func (ds *PostJsonDataStore) Index(object interface{}, field string, indexSqlType string) error {
+// Using index helped in some cases to reduce query time to 4.7%
+func (ds *PostJsonDataStore) Index(object interface{}, field string) error {
 
-	// Check type of object & get the name of collection ------------------------------
-	var _elem reflect.Value
-	_kind := KindOf(object)
-	switch _kind {
-	case Struct:
-		_elem = reflect.ValueOf(object)
-	case Pointer2Struct:
-		_elem = reflect.Indirect(reflect.ValueOf(object))
+	if field == "Id" || field == "CreatedAt" || field == "UpdatedAt" {
+		return fmt.Errorf("gohst.Index: Can't index any of the fields Id, CreatedAt and UpdatedAt")
 	}
 
-	_type := _elem.Type()
-	_typeName := _type.Name()
-	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
+	_type := TypeOf(object, field)
+	if _type == "" {
+		// Can't index struct ot pointers, field has to have basic type
+		return fmt.Errorf("gohst.Index: Unable to index %s either it doesn't exist or it's type is not basic", field)
+	}
 
-	sql := fmt.Sprintf("CREATE INDEX %s_idx ON %s(((data->>'%s')::%s));", field, tableName, field, indexSqlType)
+	_name, _, _ := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
+
+	_json := JsonName(object, field)
+	if _json != "" {
+		field = _json
+	}
+
+	sql := ""
+	if strings.Contains(_type, "[]") {
+		sql = fmt.Sprintf("CREATE INDEX _array_%s_%s_idx ON %s USING GIN (%s(data,'%s'));", tableName, field, tableName, "_array", field)
+	} else {
+		switch _type {
+		case "string":
+			sql = fmt.Sprintf("CREATE INDEX %s_%s_idx ON %s(((data->>'%s')::%s));", tableName, field, tableName, field, SQLTypes[_type])
+		case "time.Time":
+			sql = fmt.Sprintf("CREATE INDEX %s_%s_idx ON %s(_date(data,'%s'));", tableName, field, tableName, field)
+		}
+	}
+	// simple field (int, float, string, date)
+	// array (string, float, array, date)
+
+	// fmt.Println(sql)
 	ds.DB.Exec(sql)
 	return nil
 }
 
 func (ds *PostJsonDataStore) Execute(object interface{}, procedure string) (err error) {
 
-	_slice := reflect.Indirect(reflect.ValueOf(object))
-	_type := reflect.TypeOf(object).Elem().Elem()
+	_, _type, _value := TypeName(object)
 
 	// TODO: SQL injection!
 
@@ -338,18 +388,7 @@ func (ds *PostJsonDataStore) Execute(object interface{}, procedure string) (err 
 	}
 	defer rows.Close()
 
-	for rows.Next() {
-		var record Record
-		_object := reflect.New(_type)
-
-		rows.Scan(&record.Id, &record.Data, &record.CreatedAt, &record.UpdatedAt)
-
-		_object.Elem().FieldByName("Id").SetInt(record.Id)
-		_object.Elem().FieldByName("CreatedAt").Set(reflect.ValueOf(record.CreatedAt))
-		_object.Elem().FieldByName("UpdatedAt").Set(reflect.ValueOf(record.UpdatedAt))
-		json.Unmarshal(record.Data, _object.Interface())
-		_slice.Set(reflect.Append(_slice, _object.Elem()))
-	}
+	unpackRows(rows, _type, _value)
 
 	return
 }
@@ -363,35 +402,60 @@ func (ds *PostJsonDataStore) ExecuteRaw(procedure string) (result string, err er
 
 func (ds *PostJsonDataStore) Prepare(name string, object interface{}, request Requester) error {
 
+	_name, _, _ := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
+
 	if ds.CollectionStmts[tableName][name] != nil {
-		return fmt.Errorf("gohst.Prepare requires a name")
+		return fmt.Errorf("gohst.Prepare [%s][%s] statement already exist", tableName, name)
 	}
 
-	var _elem reflect.Value
-	_kind := KindOf(object)
-	switch _kind {
-	case Struct:
-		_elem = reflect.ValueOf(object)
-	case Pointer2Struct:
-		_elem = reflect.Indirect(reflect.ValueOf(object))
-	}
-
-	_type := _elem.Type()
-	_typeName := _type.Name()
-	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_typeName))
-
-	// INSERT
-	// SELECT
-	// == No need to check on $1 since not all prepared statements need it!
-	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake())
+	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake(object))
 	prepared, err := ds.DB.Prepare(sql)
 	if err != nil {
 		fmt.Printf("gohst.PostJson.Prepare: %s\nQuery: %s", err, sql)
 	}
 	ds.CollectionStmts[tableName][name] = prepared
 
-	// DELETE
-
 	return nil
+
+}
+
+func (ds *PostJsonDataStore) ExecutePrepared(name string, object interface{}, values ...interface{}) (err error) {
+
+	_name, _type, _value := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
+
+	prepared := ds.CollectionStmts[tableName][name]
+	if prepared == nil {
+		return fmt.Errorf("gohst.ExecutePrepared [%s][%s] statement doesn't exist", tableName, name)
+	}
+
+	var rows *sql.Rows
+	rows, err = prepared.Query(values...)
+
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	unpackRows(rows, _type, _value)
+
+	return
+}
+
+func unpackRows(rows *sql.Rows, _type reflect.Type, _slice reflect.Value) {
+
+	for rows.Next() {
+		var record Record
+		_object := reflect.New(_type)
+
+		rows.Scan(&record.Id, &record.Data, &record.CreatedAt, &record.UpdatedAt)
+
+		_object.Elem().FieldByName("Id").SetInt(record.Id)
+		_object.Elem().FieldByName("CreatedAt").Set(reflect.ValueOf(record.CreatedAt))
+		_object.Elem().FieldByName("UpdatedAt").Set(reflect.ValueOf(record.UpdatedAt))
+		json.Unmarshal(record.Data, _object.Interface())
+		_slice.Set(reflect.Append(_slice, _object.Elem()))
+	}
 
 }

@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-type Entry struct {
+type Clause struct {
 	Field    string
 	Operator string
 	Values   interface{}
 }
 
-func (e *Entry) Bake() string {
+func (e *Clause) Bake(object interface{}) (caluse string) {
 
 	// == Work the field
 	field := e.Field
@@ -25,13 +25,22 @@ func (e *Entry) Bake() string {
 	case "UpdatedAt":
 		field = "updated_at"
 	default:
-		fields := strings.Split(field, ":")
-		if len(fields) > 1 {
-			// == SQL casting included
-			field = fmt.Sprintf("(data->>'%s')::%s", fields[0], fields[1])
+		if strings.Contains(field, "::") {
+			fieldParts := strings.Split(field, "::")
+			field = fmt.Sprintf("(data->>'%s')::%s", fieldParts[0], fieldParts[1])
 		} else {
-			// == Use default
-			field = fmt.Sprintf("data->>'%s'", field)
+			_type := TypeOf(object, field)
+			field = JsonName(object, field)
+			switch _type {
+			case "[]string":
+				field = fmt.Sprintf("_array(data,'%s')", field)
+			case "time.Time":
+				field = fmt.Sprintf("_date(data,'%s')", field)
+			case "int":
+				field = fmt.Sprintf("(data->>'%s')::int", field)
+			default:
+				field = fmt.Sprintf("data->>'%s'", field)
+			}
 		}
 	}
 
@@ -39,7 +48,6 @@ func (e *Entry) Bake() string {
 	var values []string
 	var value string
 
-	// isSlice := gohst.KindOf(e.Values) == gohst.SliceOfPrimitive
 	isSlice := reflect.TypeOf(e.Values).Kind() == reflect.Slice
 	var _type reflect.Type
 
@@ -60,7 +68,11 @@ func (e *Entry) Bake() string {
 		}
 	case _kind == reflect.String:
 		process = func(i interface{}) string {
-			return fmt.Sprintf("'%v'", i)
+			if strings.Contains(i.(string), "$") {
+				return fmt.Sprintf("%v", i)
+			} else {
+				return fmt.Sprintf("'%v'", i)
+			}
 		}
 	case _kind == reflect.Bool:
 		process = func(i interface{}) string {
@@ -92,11 +104,17 @@ func (e *Entry) Bake() string {
 		value = process(e.Values)
 	}
 
-	return field + " " + e.Operator + " " + value
+	if e.Operator == "<@" {
+		caluse = fmt.Sprintf("%s %s %s", value, e.Operator, field)
+	} else {
+		caluse = fmt.Sprintf("%s %s %s", field, e.Operator, value)
+	}
+
+	return
 }
 
 type Requester interface {
-	Bake() string
+	Bake(object interface{}) string
 }
 
 // == Prepared Statement Caller
@@ -104,44 +122,44 @@ type PreparedStatement struct {
 	name string
 }
 
-func (ps *PreparedStatement) Bake() string {
+func (ps *PreparedStatement) Bake(object interface{}) string {
 	return ps.name
 }
 
 // == SQL Request Builder
 type RequestChain struct {
-	entries     []Entry
+	clauses     []Clause
 	operations  []string
 	isGroupOpen bool
 }
 
-func (rc *RequestChain) Where(e Entry) *RequestChain {
-	rc.entries = append(rc.entries, e)
+func (rc *RequestChain) Where(e Clause) *RequestChain {
+	rc.clauses = append(rc.clauses, e)
 	rc.operations = append(rc.operations, "WHERE")
 	return rc
 }
 
-func (rc *RequestChain) And(e Entry) *RequestChain {
-	rc.entries = append(rc.entries, e)
+func (rc *RequestChain) And(e Clause) *RequestChain {
+	rc.clauses = append(rc.clauses, e)
 	rc.operations = append(rc.operations, "AND")
 	return rc
 }
 
-func (rc *RequestChain) Or(e Entry) *RequestChain {
-	rc.entries = append(rc.entries, e)
+func (rc *RequestChain) Or(e Clause) *RequestChain {
+	rc.clauses = append(rc.clauses, e)
 	rc.operations = append(rc.operations, "Or")
 	return rc
 }
 
-func (rc *RequestChain) WhereGroup(e Entry) *RequestChain {
-	rc.entries = append(rc.entries, e)
+func (rc *RequestChain) WhereGroup(e Clause) *RequestChain {
+	rc.clauses = append(rc.clauses, e)
 	rc.operations = append(rc.operations, "WHERE (")
 	rc.isGroupOpen = true
 	return rc
 }
 
-func (rc *RequestChain) AndGroup(e Entry) *RequestChain {
-	rc.entries = append(rc.entries, e)
+func (rc *RequestChain) AndGroup(e Clause) *RequestChain {
+	rc.clauses = append(rc.clauses, e)
 	if rc.isGroupOpen {
 		rc.operations = append(rc.operations, ") AND (")
 	} else {
@@ -151,8 +169,8 @@ func (rc *RequestChain) AndGroup(e Entry) *RequestChain {
 	return rc
 }
 
-func (rc *RequestChain) OrGroup(e Entry) *RequestChain {
-	rc.entries = append(rc.entries, e)
+func (rc *RequestChain) OrGroup(e Clause) *RequestChain {
+	rc.clauses = append(rc.clauses, e)
 	if rc.isGroupOpen {
 		rc.operations = append(rc.operations, ") OR (")
 	} else {
@@ -162,10 +180,10 @@ func (rc *RequestChain) OrGroup(e Entry) *RequestChain {
 	return rc
 }
 
-func (rc *RequestChain) Bake() string {
+func (rc *RequestChain) Bake(object interface{}) string {
 	conditions := ""
 	for idx, op := range rc.operations {
-		conditions += fmt.Sprintf("%s %s", op, rc.entries[idx].Bake())
+		conditions += fmt.Sprintf("%s %s", op, rc.clauses[idx].Bake(object))
 	}
 
 	if rc.isGroupOpen {
@@ -173,4 +191,11 @@ func (rc *RequestChain) Bake() string {
 	}
 
 	return conditions
+}
+
+func Ints2String(ids []int64) (values string) {
+	values = fmt.Sprintf("%v", ids)
+	values = strings.Trim(values, "[]")
+	values = strings.Replace(values, " ", ",", -1)
+	return
 }

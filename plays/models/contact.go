@@ -33,6 +33,7 @@ type Contact struct {
 	Categories     []string  `json:"categories"`
 	Sectors        []string  `json:"sectors"`
 	Interests      []string  `json:"interests"`
+	ArchivedAt     time.Time `json:"archived_at"`
 	CreatedAt      time.Time `json:"-"`
 	UpdatedAt      time.Time `json:"-"`
 }

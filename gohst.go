@@ -17,10 +17,14 @@ type DataStoreContainer interface {
 	Disconnect() error
 	Put(interface{}) error
 	Get(interface{}, Requester) error
+	GetById(interface{}, []int64) error
+	GetRawById(interface{}, []int64) (string, error)
 	GetRaw(interface{}, Requester) (string, error)
-	Delete(interface{}, interface{}) error
-	Index(interface{}, string, string) error
+	Delete(interface{}, Requester) error
+	DeleteById(interface{}, []int64) error
+	Index(interface{}, string) error
 	Prepare(string, interface{}, Requester) error
+	ExecutePrepared(string, interface{}, ...interface{}) error
 	Execute(interface{}, string) error
 	ExecuteRaw(string) (string, error)
 }
@@ -93,6 +97,26 @@ func (ds *DataStore) Get(object interface{}, request Requester) error {
 	return ds.container.Get(object, request)
 }
 
+func (ds *DataStore) GetById(object interface{}, ids []int64) error {
+
+	_objectKind := KindOf(object)
+	if _objectKind != Pointer2SliceOfStruct {
+		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
+	}
+
+	return ds.container.GetById(object, ids)
+}
+
+func (ds *DataStore) GetAll(object interface{}) error {
+
+	_objectKind := KindOf(object)
+	if _objectKind != Pointer2SliceOfStruct {
+		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
+	}
+
+	return ds.container.GetById(object, []int64{})
+}
+
 // Works just like Get() but returns a JSON array in a string instead of objects array.
 func (ds *DataStore) GetRaw(object interface{}, request Requester) (string, error) {
 
@@ -102,6 +126,27 @@ func (ds *DataStore) GetRaw(object interface{}, request Requester) (string, erro
 	}
 
 	return ds.container.GetRaw(object, request)
+}
+
+// Works just like GetRaw() and returns a JSON array in a string based on a list of ids
+func (ds *DataStore) GetRawById(object interface{}, ids []int64) (result string, err error) {
+
+	_objectKind := KindOf(object)
+	if _objectKind != Pointer2SliceOfStruct {
+		return "", fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
+	}
+
+	return ds.container.GetRawById(object, ids)
+}
+
+func (ds *DataStore) GetAllRaw(object interface{}) (string, error) {
+
+	_objectKind := KindOf(object)
+	if _objectKind != Pointer2SliceOfStruct {
+		return "", fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
+	}
+
+	return ds.container.GetRawById(object, []int64{})
 }
 
 // Execute a procedure in the database and return an array of objects, the array is of the same type
@@ -134,26 +179,33 @@ func (ds *DataStore) ExecuteRaw(procedure string) (string, error) {
 	return ds.container.ExecuteRaw(procedure)
 }
 
-// Deletes all the objects using their IDs, an array of IDs must be passed
-// and the array should not be empty otherwise nothing happens
-func (ds *DataStore) Delete(object interface{}, ids interface{}) error {
+// Delete all objects based on their IDs
+func (ds *DataStore) DeleteById(object interface{}, ids []int64) error {
 
 	_objectKind := KindOf(object)
 	if _objectKind != Pointer2SliceOfStruct && _objectKind != SliceOfStruct {
 		return fmt.Errorf("gohst.Delete() accepts a slice or pointer to slice of a struct type as an object")
 	}
 
-	_idsKind := KindOf(ids)
-	if _idsKind != SliceOfPrimitive {
-		return fmt.Errorf("gohst.Delete() accepts slice of a primitive type as ids e.g int64 or string")
+	return ds.container.DeleteById(object, ids)
+}
+
+// Delete all objects based on a query
+func (ds *DataStore) Delete(object interface{}, request Requester) error {
+
+	_objectKind := KindOf(object)
+	if _objectKind != Pointer2SliceOfStruct && _objectKind != SliceOfStruct {
+		return fmt.Errorf("gohst.Delete() accepts a slice or pointer to slice of a struct type as an object")
 	}
 
-	return ds.container.Delete(object, ids)
+	return ds.container.Delete(object, request)
 }
 
 // Connect to the database
 func (ds *DataStore) Connect() error {
+
 	err := ds.container.Connect()
+
 	if err != nil {
 		return fmt.Errorf("gohst.Connect() couldn't connect: %s", err)
 	}
@@ -163,13 +215,15 @@ func (ds *DataStore) Connect() error {
 
 // Disconnect from the database
 func (ds *DataStore) Disconnect() error {
+
 	return ds.container.Disconnect()
+
 }
 
 // Index takes an object e.g Contact{} and a name of field in the object e.g. "FirstName"
 // and an SQL type e.g "VARCHAR" to create an index on that field named {field_name}_idx.
 // In some test the speed of indexed field search was 4.7% of of same search without index.
-func (ds *DataStore) Index(object interface{}, field string, indexSqlType string) error {
+func (ds *DataStore) Index(object interface{}, field string) error {
 	_kind := KindOf(object)
 	if _kind != Struct && _kind != Pointer2Struct {
 		return fmt.Errorf("gohst.Index() only accepts an object or a pointer to an object of type struct")
@@ -179,7 +233,7 @@ func (ds *DataStore) Index(object interface{}, field string, indexSqlType string
 		return fmt.Errorf("gohst.Index() field name can't be empty")
 	}
 
-	return ds.container.Index(object, field, indexSqlType)
+	return ds.container.Index(object, field)
 }
 
 func (ds *DataStore) Prepare(name string, object interface{}, request Requester) error {
@@ -194,5 +248,13 @@ func (ds *DataStore) Prepare(name string, object interface{}, request Requester)
 	}
 
 	return ds.container.Prepare(name, object, request)
+}
 
+func (ds *DataStore) ExecutePrepared(name string, object interface{}, values ...interface{}) error {
+
+	if name == "" {
+		return fmt.Errorf("gohst.ExecutePrepared requires a name")
+	}
+
+	return ds.container.ExecutePrepared(name, object, values...)
 }
