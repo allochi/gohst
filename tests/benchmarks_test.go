@@ -4,7 +4,6 @@ package main
 import (
 	"allochi/gohst"
 	. "allochi/gohst/plays/models"
-	_ "github.com/lib/pq"
 	"testing"
 )
 
@@ -32,12 +31,22 @@ func BenchmarkReadData(b *testing.B) {
 
 	Contactizer, _ := gohst.GetDataStore("Contactizer")
 
+	// request := &gohst.RequestChain{}
+	// request.Where(gohst.Clause{"Id", "=", []int64{9}})
+	// request.Where(gohst.Clause{"Id", "=", "$1"})
+	// Contactizer.Prepare("One", Contact{}, request)
+
 	for i := 0; i < b.N; i++ {
 		var allContacts []Contact
-		// request := &gohst.RequestChain{}
-		// request.Where(gohst.Clause{"Id", "IN", []int64{9}})
-		// err := Contactizer.Get(&allContacts, request)
+		// BenchmarkReadData	    5000	    386074 ns/op
+		// Contactizer.Get(&allContacts, request)
+
+		// BenchmarkReadData	    5000	    266317 ns/op (3755 objects)
 		err := Contactizer.GetById(&allContacts, []int64{9})
+
+		// BenchmarkReadData	   10000	    281835 ns/op
+		// Contactizer.ExecutePrepared("One", &allContacts, 9)
+
 		if err != nil {
 			b.Fatalf("gohst error: %s", err)
 		}

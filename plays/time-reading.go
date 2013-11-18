@@ -25,15 +25,17 @@ func main() {
 		fmt.Printf("Error: %s\n", err)
 	}
 
+	numObjects := 3187
+
 	checkTime := time.Now()
 
-	for i := 0; i < 2000; i++ {
+	for i := 0; i < numObjects; i++ {
 		var contacts []Contact
 		ids := []int64{9}
-		// request := &gohst.RequestChain{}
-		// request.Where(gohst.Clause{"Id", "IN", ids})
-		// err = Contactizer.Get(&contacts, request)
-		Contactizer.GetById(&contacts, ids)
+		request := &gohst.RequestChain{}
+		request.Where(gohst.Clause{"Id", "IN", ids})
+		err = Contactizer.Get(&contacts, request)
+		// Contactizer.GetById(&contacts, ids)
 		// Contactizer.GetRawById(Contact{}, ids)
 		if err != nil {
 			fmt.Printf("Error: %s\n", err)
@@ -41,6 +43,7 @@ func main() {
 	}
 
 	duration := time.Since(checkTime)
-	fmt.Printf("[Duration]: %s\n", duration)
+	fmt.Printf("[Duration for %d]: %s\n", numObjects, duration)
+	// fmt.Printf("[Duration]: %s\n", duration)
 
 }

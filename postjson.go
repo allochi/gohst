@@ -443,7 +443,7 @@ func (ds *PostJsonDataStore) ExecutePrepared(name string, object interface{}, va
 	return
 }
 
-func unpackRows(rows *sql.Rows, _type reflect.Type, _slice reflect.Value) {
+func unpackRows(rows *sql.Rows, _type reflect.Type, _value reflect.Value) {
 
 	for rows.Next() {
 		var record Record
@@ -455,7 +455,7 @@ func unpackRows(rows *sql.Rows, _type reflect.Type, _slice reflect.Value) {
 		_object.Elem().FieldByName("CreatedAt").Set(reflect.ValueOf(record.CreatedAt))
 		_object.Elem().FieldByName("UpdatedAt").Set(reflect.ValueOf(record.UpdatedAt))
 		json.Unmarshal(record.Data, _object.Interface())
-		_slice.Set(reflect.Append(_slice, _object.Elem()))
+		_value.Set(reflect.Append(_value, _object.Elem()))
 	}
 
 }
