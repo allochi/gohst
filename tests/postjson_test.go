@@ -164,7 +164,9 @@ func TestCreateIndexForDate(t *testing.T) {
 	}
 
 	request := &gohst.RequestChain{}
-	request.Where(gohst.Clause{"archived_at", "<", "2011-05-01 00:00:00"})
+	// request.Where(gohst.Clause{"archived_at", "<", "2011-05-01 00:00:00"})
+	date, _ := time.Parse("2006-01-02 15:04:05", "2011-05-01 00:00:00")
+	request.Where(gohst.Clause{"archived_at", "<", date})
 	listTwo := []Contact{}
 	Contactizer.Get(&listTwo, request)
 

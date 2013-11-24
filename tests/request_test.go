@@ -30,7 +30,7 @@ func TestRequestDate(t *testing.T) {
 	request.Where(gohst.Clause{"ArchivedAt", ">", time.Now()})
 	query := request.Bake(Contact{})
 
-	expected := fmt.Sprintf("WHERE _date(data,'archived_at') > '%s'", time.Now().Format("2006-01-02 15:04:05"))
+	expected := fmt.Sprintf("WHERE _date(data,'archived_at') > '%s'", time.Now().Format(time.RFC3339))
 
 	if query != expected {
 		t.Errorf("Expected: %s\nGot: %s", expected, query)

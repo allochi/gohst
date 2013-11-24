@@ -57,6 +57,11 @@ func (ds *PostJsonDataStore) Connect() (err error) {
 		return
 	}
 
+	err = ds.loadFunctions()
+	if err != nil {
+		return
+	}
+
 	err = ds.loadCollectionNames()
 	return
 }
@@ -83,6 +88,46 @@ func (ds *PostJsonDataStore) loadCollectionNames() (err error) {
 			rows.Scan(&tableName)
 			ds.CollectionNames[tableName] = true
 			ds.prepareStatements(tableName)
+		}
+	}
+
+	return
+}
+
+func (ds *PostJsonDataStore) loadFunctions() (err error) {
+
+	var count int
+	query := "SELECT count(*) FROM pg_proc WHERE proname IN ('_array','_date');"
+	err = ds.DB.QueryRow(query).Scan(&count)
+
+	if err != nil {
+		return
+	}
+
+	functions := []string{
+		`
+			CREATE OR REPLACE FUNCTION _array(_j json, _key text) RETURNS text[] as $$
+			SELECT concat('{',btrim(_j->>_key,'[]'),'}')::text[]
+			$$ LANGUAGE SQL IMMUTABLE;
+			`,
+		`
+			CREATE OR REPLACE FUNCTION _date(_j json, _key text) RETURNS TIMESTAMP as $$
+			SELECT (_j->>_key)::TIMESTAMP
+			$$ LANGUAGE SQL IMMUTABLE;
+			`,
+		`
+			CREATE OR REPLACE FUNCTION _in(_list text) RETURNS setof int as $$
+			SELECT unnest(string_to_array(btrim(_list,'()'), ',')::integer[]);
+			$$ LANGUAGE SQL IMMUTABLE;
+			`,
+	}
+
+	if count < len(functions) {
+		for _, sql := range functions {
+			_, err = ds.DB.Exec(sql)
+			if err != nil {
+				return
+			}
 		}
 	}
 
@@ -193,7 +238,7 @@ func (ds *PostJsonDataStore) GetById(object interface{}, ids []int64) (err error
 		rows, err = ds.CollectionStmts[tableName]["SELID"].Query(ids[0])
 		// rows, err = ds.DB.Query(fmt.Sprintf("SELECT * FROM %s where id = $1;", tableName), ids[0])
 	case len(ids) > 1:
-		rows, err = ds.CollectionStmts[tableName]["SELIN"].Query(Ints2String(ids))
+		rows, err = ds.CollectionStmts[tableName]["SELIN"].Query(IN(ids))
 	}
 
 	if err != nil {
@@ -221,7 +266,7 @@ func (ds *PostJsonDataStore) GetRawById(object interface{}, ids []int64) (result
 	case len(ids) == 1:
 		err = ds.CollectionStmts[tableName]["SELIDRAW"].QueryRow(ids[0]).Scan(&result)
 	case len(ids) > 1:
-		err = ds.CollectionStmts[tableName]["SELINRAW"].QueryRow(Ints2String(ids)).Scan(&result)
+		err = ds.CollectionStmts[tableName]["SELINRAW"].QueryRow(IN(ids)).Scan(&result)
 	}
 
 	return
@@ -236,6 +281,7 @@ func (ds *PostJsonDataStore) Get(object interface{}, request Requester) (err err
 
 	var rows *sql.Rows
 	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake(object))
+	fmt.Println(sql)
 	rows, err = ds.DB.Query(sql)
 
 	if err != nil {
@@ -311,16 +357,16 @@ func (ds *PostJsonDataStore) prepareStatements(tableName string) (err error) {
 	// SELECT for GetById
 	sqls["SELALL"] = fmt.Sprintf("SELECT * FROM %s;", tableName)
 	sqls["SELID"] = fmt.Sprintf("SELECT * FROM %s where id = $1;", tableName)
-	sqls["SELIN"] = fmt.Sprintf("SELECT * FROM %s where id IN (SELECT unnest(string_to_array($1, ',')::integer[]));", tableName)
+	sqls["SELIN"] = fmt.Sprintf("SELECT * FROM %s where id IN (SELECT _in($1));", tableName)
 
 	// SELECT RAW JSON for GetRawById
 	sqls["SELRAW"] = fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s) row_data;", tableName)
 	sqls["SELIDRAW"] = fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s WHERE id = $1) row_data;", tableName)
-	sqls["SELINRAW"] = fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s WHERE id IN (SELECT unnest(string_to_array($1, ',')::integer[])) ) row_data;", tableName)
+	sqls["SELINRAW"] = fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s WHERE id IN (SELECT _in($1))) row_data;", tableName)
 
 	// DELETE for DeleteById
 	sqls["DELID"] = fmt.Sprintf("DELETE FROM %s where id = $1;", tableName)
-	sqls["DELIN"] = fmt.Sprintf("DELETE FROM %s where id in (select unnest(string_to_array($1, ',')::integer[]));", tableName)
+	sqls["DELIN"] = fmt.Sprintf("DELETE FROM %s where id in (select _in($1));", tableName)
 
 	for key, value := range sqls {
 		prepared[key], err = ds.DB.Prepare(value)

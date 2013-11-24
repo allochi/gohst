@@ -15,7 +15,7 @@ type Clause struct {
 
 func (e *Clause) Bake(object interface{}) (caluse string) {
 
-	// == Work the field
+	// Work the field
 	field := e.Field
 	switch field {
 	case "Id":
@@ -44,68 +44,19 @@ func (e *Clause) Bake(object interface{}) (caluse string) {
 		}
 	}
 
-	// == Work the values
-	var values []string
+	// Work the values
 	var value string
 
 	isSlice := reflect.TypeOf(e.Values).Kind() == reflect.Slice
-	var _type reflect.Type
 
 	if isSlice {
-		_type = reflect.TypeOf(e.Values).Elem()
-	} else {
-		_type = reflect.TypeOf(e.Values)
-	}
-
-	_kind := _type.Kind()
-
-	var process func(interface{}) string
-
-	switch {
-	case _kind >= reflect.Int && _kind <= reflect.Float64:
-		process = func(i interface{}) string {
-			return fmt.Sprintf("%v", i)
-		}
-	case _kind == reflect.String:
-		process = func(i interface{}) string {
-			if strings.Contains(i.(string), "$") {
-				return fmt.Sprintf("%v", i)
-			} else {
-				return fmt.Sprintf("'%v'", i)
-			}
-		}
-	case _kind == reflect.Bool:
-		process = func(i interface{}) string {
-			return fmt.Sprintf("%t", i)
-		}
-	case _type == reflect.TypeOf(time.Now()):
-		process = func(i interface{}) string {
-			return "'" + i.(time.Time).Format("2006-01-02 15:04:05") + "'"
-		}
-	case _kind == reflect.Struct:
-		process = func(i interface{}) string {
-			_id := reflect.ValueOf(i).FieldByName("Id")
-			if _id.Kind() == reflect.Invalid {
-				return ""
-			} else {
-				return fmt.Sprintf("%v", _id.Interface())
-			}
-		}
-	}
-
-	if isSlice {
-		slice := reflect.ValueOf(e.Values)
-		values = make([]string, slice.Len())
-		for i := 0; i < slice.Len(); i++ {
-			values[i] = process(slice.Index(i).Interface())
-		}
-		value = fmt.Sprintf("(%s)", strings.Join(values, ","))
+		value = IN(e.Values)
 	} else {
 		value = process(e.Values)
 	}
 
-	if e.Operator == "<@" {
-		caluse = fmt.Sprintf("%s %s %s", value, e.Operator, field)
+	if e.Operator == "<@" || e.Operator == "@>" {
+		caluse = fmt.Sprintf("%s %s %s", value, "<@", field)
 	} else {
 		caluse = fmt.Sprintf("%s %s %s", field, e.Operator, value)
 	}
@@ -113,11 +64,44 @@ func (e *Clause) Bake(object interface{}) (caluse string) {
 	return
 }
 
+func process(value interface{}) string {
+
+	var _type reflect.Type
+	_type = reflect.TypeOf(value)
+
+	_kind := _type.Kind()
+
+	switch {
+	case _kind >= reflect.Int && _kind <= reflect.Float64:
+		return fmt.Sprintf("%v", value)
+	case _kind == reflect.String:
+		if strings.Contains(value.(string), "$") {
+			return fmt.Sprintf("%v", value)
+		} else {
+			return fmt.Sprintf("'%v'", value)
+		}
+	case _kind == reflect.Bool:
+		return fmt.Sprintf("%t", value)
+	case _type == reflect.TypeOf(time.Now()):
+		return "'" + value.(time.Time).Format(time.RFC3339) + "'"
+	case _kind == reflect.Struct:
+		_id := reflect.ValueOf(value).FieldByName("Id")
+		if _id.Kind() == reflect.Invalid {
+			return ""
+		} else {
+			return fmt.Sprintf("%v", _id.Interface())
+		}
+	}
+
+	return ""
+
+}
+
 type Requester interface {
 	Bake(object interface{}) string
 }
 
-// == Prepared Statement Caller
+// Prepared Statement Caller
 type PreparedStatement struct {
 	name string
 }
@@ -126,7 +110,7 @@ func (ps *PreparedStatement) Bake(object interface{}) string {
 	return ps.name
 }
 
-// == SQL Request Builder
+// SQL Request Builder
 type RequestChain struct {
 	clauses     []Clause
 	operations  []string
@@ -193,9 +177,61 @@ func (rc *RequestChain) Bake(object interface{}) string {
 	return conditions
 }
 
-func Ints2String(ids []int64) (values string) {
-	values = fmt.Sprintf("%v", ids)
+// This takes a slice and an optional boolean, the slice get converted to a sql list,
+// if the boolean is based as true, then the list will be constructed as an sql array,
+// if any other type is based than a slice and empty string is returned.
+func IN(_slice interface{}, params ...bool) (values string) {
+
+	_type := reflect.TypeOf(_slice)
+	_typeName := _type.String()
+	if !strings.Contains(_typeName, "[]") {
+		return
+	}
+
+	// Time thus convert to a slice of strings of time.RFC3339
+	if _typeName == "[]time.Time" {
+		times := _slice.([]time.Time)
+		fomats := make([]string, len(times))
+		for index, value := range times {
+			fomats[index] = value.Format(time.RFC3339)
+		}
+		_slice = fomats
+	}
+
+	// Objects thus get their Ids as []int64
+	if _typeName != "[]time.Time" && _type.Elem().Kind() == reflect.Struct {
+		length := reflect.ValueOf(_slice).Len()
+		ids := make([]interface{}, length)
+		for index := 0; index < length; index++ {
+			object := reflect.ValueOf(_slice).Index(index)
+			ids[index] = object.FieldByName("Id").Interface()
+		}
+		_slice = ids
+	}
+
+	isArray := len(params) > 0 && params[0]
+
+	values = fmt.Sprintf("%v", _slice)
 	values = strings.Trim(values, "[]")
-	values = strings.Replace(values, " ", ",", -1)
+
+	seperator := "','"
+	surrounder := "'%s'"
+	brackets := "(%s)"
+	if isArray {
+		seperator = "\",\""
+		surrounder = "\"%s\""
+		brackets = "{%s}"
+	}
+
+	if _typeName != "[]string" && _typeName != "[]time.Time" {
+		seperator = ","
+		surrounder = "%s"
+	}
+
+	values = strings.Replace(values, " ", seperator, -1)
+	values = fmt.Sprintf(surrounder, values)
+	values = fmt.Sprintf(brackets, values)
+
 	return
+
 }

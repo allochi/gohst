@@ -34,8 +34,10 @@ func TestPreparedSelect(t *testing.T) {
 
 	Contactizer.Index(Contact{}, "categories")
 
+	categories := []string{"Governments", "Donors"}
+
 	request := &gohst.RequestChain{}
-	request.Where(gohst.Clause{"categories", "<@", "{Governments, Donors}"})
+	request.Where(gohst.Clause{"categories", "<@", gohst.IN(categories, true)})
 
 	requestPrepared := &gohst.RequestChain{}
 	requestPrepared.Where(gohst.Clause{"categories", "<@", "$1"})
@@ -47,7 +49,7 @@ func TestPreparedSelect(t *testing.T) {
 	fmt.Printf("[Direct  ]: %s\n", durationDirect)
 
 	checkTimePrepared := time.Now()
-	Contactizer.ExecutePrepared("SelectByCategory", &contacts, "{Governments, Donors}")
+	Contactizer.ExecutePrepared("SelectByCategory", &contacts, gohst.IN(categories, true))
 	durationPrepared := time.Since(checkTimePrepared)
 	fmt.Printf("[Prepared]: %s\n", durationPrepared)
 

@@ -182,9 +182,9 @@ func (ds *DataStore) ExecuteRaw(procedure string) (string, error) {
 // Delete all objects based on their IDs
 func (ds *DataStore) DeleteById(object interface{}, ids []int64) error {
 
-	_objectKind := KindOf(object)
-	if _objectKind != Pointer2SliceOfStruct && _objectKind != SliceOfStruct {
-		return fmt.Errorf("gohst.Delete() accepts a slice or pointer to slice of a struct type as an object")
+	_kind := KindOf(object)
+	if _kind != Struct && _kind != Pointer2Struct {
+		return fmt.Errorf("gohst.DeleteById() accepts only an object or a pointer to an object of type struct")
 	}
 
 	return ds.container.DeleteById(object, ids)
@@ -193,9 +193,9 @@ func (ds *DataStore) DeleteById(object interface{}, ids []int64) error {
 // Delete all objects based on a query
 func (ds *DataStore) Delete(object interface{}, request Requester) error {
 
-	_objectKind := KindOf(object)
-	if _objectKind != Pointer2SliceOfStruct && _objectKind != SliceOfStruct {
-		return fmt.Errorf("gohst.Delete() accepts a slice or pointer to slice of a struct type as an object")
+	_kind := KindOf(object)
+	if _kind != Struct && _kind != Pointer2Struct {
+		return fmt.Errorf("gohst.Delete() accepts only an object or a pointer to an object of type struct")
 	}
 
 	return ds.container.Delete(object, request)

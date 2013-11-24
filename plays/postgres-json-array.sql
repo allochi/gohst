@@ -1,7 +1,12 @@
-DROP FUNCTION _array(_j json, _key text);
+-- More practical is just string processing
 CREATE OR REPLACE FUNCTION _array(_j json, _key text) RETURNS text[] as $$
-    SELECT array_agg(btrim(x.elem::text, '"')) from json_array_elements((_j->>_key)::json) as x(elem)
+    SELECT concat('{',btrim(_j->>_key,'[]'),'}')::text[]
 $$ LANGUAGE SQL IMMUTABLE;
+
+-- DROP FUNCTION _array(_j json, _key text);
+-- CREATE OR REPLACE FUNCTION _array(_j json, _key text) RETURNS text[] as $$
+--     SELECT array_agg(btrim(x.elem::text, '"')) from json_array_elements((_j->>_key)::json) as x(elem)
+-- $$ LANGUAGE SQL IMMUTABLE;
 
 DROP INDEX _array_categories_idx;
 CREATE INDEX _array_categories_idx ON json_contacts USING GIN (_array(data,'categories'));
