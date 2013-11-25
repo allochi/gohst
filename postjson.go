@@ -281,7 +281,6 @@ func (ds *PostJsonDataStore) Get(object interface{}, request Requester) (err err
 
 	var rows *sql.Rows
 	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake(object))
-	fmt.Println(sql)
 	rows, err = ds.DB.Query(sql)
 
 	if err != nil {

@@ -6,10 +6,10 @@ import (
 	. "allochi/gohst/plays/models"
 	// "allochi/inflect"
 	"database/sql"
-	// "encoding/json"
+	"encoding/json"
 	// "fmt"
 	_ "github.com/lib/pq"
-	"strings"
+	// "strings"
 	"testing"
 	// "time"
 )
@@ -58,7 +58,7 @@ func TestGetById(t *testing.T) {
 
 	var contacts []Contact
 	ids := []int64{4, 5, 6, 7, 8, 9}
-	err := Contactizer.GetById(&contacts, ids)
+	err := Contactizer.Get(&contacts, ids)
 
 	if err != nil {
 		t.Errorf("Database Error: %s", err)
@@ -79,7 +79,7 @@ func TestGetAll(t *testing.T) {
 	Contactizer, _ := gohst.GetDataStore("Contactizer")
 
 	var contacts []Contact
-	err := Contactizer.GetAll(&contacts)
+	err := Contactizer.Get(&contacts)
 
 	if err != nil {
 		t.Errorf("Database Error: %s", err)
@@ -109,7 +109,16 @@ func TestGetRaw(t *testing.T) {
 	}
 
 	expected := len(ids)
-	got := strings.Count(data, "first_name")
+
+	var results interface{}
+	err = json.Unmarshal([]byte(data), &results)
+	if err != nil {
+		t.Errorf("Couldn't unpack json")
+	}
+
+	contacts := results.([]interface{})
+	// got := strings.Count(data, "first_name")
+	got := len(contacts)
 
 	if expected != got {
 		t.Errorf("Expected %d contacts got %d", expected, got)

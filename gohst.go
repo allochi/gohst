@@ -1,6 +1,7 @@
 package gohst
 
 import "fmt"
+import "reflect"
 
 type DataStore struct {
 	container DataStoreContainer
@@ -87,66 +88,63 @@ func (ds *DataStore) Put(object interface{}) error {
 // with another array of IDs, the function uses the try of the slice and fill the slice with
 // retrieved objects, if the slice is not empty it will be appended. If the IDs slice is empty
 // all object in the table will be retrieved. This function doesn't check for duplicates.
-func (ds *DataStore) Get(object interface{}, request Requester) error {
+func (ds *DataStore) Get(object interface{}, params ...interface{}) error {
 
 	_objectKind := KindOf(object)
 	if _objectKind != Pointer2SliceOfStruct {
 		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
 	}
 
-	return ds.container.Get(object, request)
-}
+	// Check the type of params
+	if len(params) > 0 {
+		options := params[0]
 
-func (ds *DataStore) GetById(object interface{}, ids []int64) error {
+		// GetById
+		if reflect.TypeOf(options).String() == "[]int64" {
+			return ds.container.GetById(object, options.([]int64))
+		}
 
-	_objectKind := KindOf(object)
-	if _objectKind != Pointer2SliceOfStruct {
-		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
+		// Get(request)
+		request, ok := options.(Requester)
+		if ok {
+			return ds.container.Get(object, request)
+		}
+	} else {
+		// GetAll
+		return ds.container.GetById(object, []int64{})
 	}
 
-	return ds.container.GetById(object, ids)
-}
-
-func (ds *DataStore) GetAll(object interface{}) error {
-
-	_objectKind := KindOf(object)
-	if _objectKind != Pointer2SliceOfStruct {
-		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
-	}
-
-	return ds.container.GetById(object, []int64{})
+	return fmt.Errorf("gohst.Get() has no proper request to process.")
 }
 
 // Works just like Get() but returns a JSON array in a string instead of objects array.
-func (ds *DataStore) GetRaw(object interface{}, request Requester) (string, error) {
+func (ds *DataStore) GetRaw(object interface{}, params ...interface{}) (string, error) {
 
 	_kind := KindOf(object)
 	if _kind != Struct && _kind != Pointer2Struct {
 		return "", fmt.Errorf("gohst.GetRaw() only accepts an object or a pointer to an object of type struct")
 	}
 
-	return ds.container.GetRaw(object, request)
-}
+	// Check the type of params
+	if len(params) > 0 {
+		options := params[0]
 
-// Works just like GetRaw() and returns a JSON array in a string based on a list of ids
-func (ds *DataStore) GetRawById(object interface{}, ids []int64) (result string, err error) {
+		// GetRawById
+		if reflect.TypeOf(options).String() == "[]int64" {
+			return ds.container.GetRawById(object, options.([]int64))
+		}
 
-	_objectKind := KindOf(object)
-	if _objectKind != Pointer2SliceOfStruct {
-		return "", fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
+		// GetRaw(request)
+		request, ok := options.(Requester)
+		if ok {
+			return ds.container.GetRaw(object, request)
+		}
+	} else {
+		// GetRawAll
+		return ds.container.GetRawById(object, []int64{})
 	}
 
-	return ds.container.GetRawById(object, ids)
-}
-
-func (ds *DataStore) GetAllRaw(object interface{}) (string, error) {
-
-	_objectKind := KindOf(object)
-	if _objectKind != Pointer2SliceOfStruct {
-		return "", fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
-	}
-
-	return ds.container.GetRawById(object, []int64{})
+	return "", fmt.Errorf("gohst.GetRaw() has no proper request to process.")
 }
 
 // Execute a procedure in the database and return an array of objects, the array is of the same type
@@ -179,26 +177,49 @@ func (ds *DataStore) ExecuteRaw(procedure string) (string, error) {
 	return ds.container.ExecuteRaw(procedure)
 }
 
-// Delete all objects based on their IDs
-func (ds *DataStore) DeleteById(object interface{}, ids []int64) error {
+// Delete objects
+func (ds *DataStore) Delete(object interface{}, params ...interface{}) error {
 
+	// object should be on struct, pointer to struct, slice of struct or pointer to slice of struct
 	_kind := KindOf(object)
-	if _kind != Struct && _kind != Pointer2Struct {
-		return fmt.Errorf("gohst.DeleteById() accepts only an object or a pointer to an object of type struct")
+	if _kind != SliceOfStruct && _kind != Pointer2SliceOfStruct && _kind != Struct && _kind != Pointer2Struct {
+		return fmt.Errorf("gohst.Delete() accepts struct, or a slice of struct as an object")
 	}
 
-	return ds.container.DeleteById(object, ids)
-}
+	// Check the type of params
+	if len(params) > 0 {
+		options := params[0]
 
-// Delete all objects based on a query
-func (ds *DataStore) Delete(object interface{}, request Requester) error {
+		// DeleteById
+		if reflect.TypeOf(options).String() == "[]int64" {
+			return ds.container.DeleteById(object, options.([]int64))
+		}
 
-	_kind := KindOf(object)
-	if _kind != Struct && _kind != Pointer2Struct {
-		return fmt.Errorf("gohst.Delete() accepts only an object or a pointer to an object of type struct")
+		// Delete(request)
+		request, ok := options.(Requester)
+		if ok {
+			return ds.container.Delete(object, request)
+		}
+	} else {
+		_value := reflect.ValueOf(object)
+		var ids []int64
+		switch _kind {
+		case _kind == Pointer2Struct:
+			_value = _value.Elem()
+			fallthrough
+		case _kind == Struct:
+			ids = append(ids, _value.FieldByName("Id").Interface().(int64))
+		case _kind == Pointer2SliceOfStruct:
+			_value = _value.Elem()
+		case _kind == SliceOfStruct:
+			for i := 0; i < _value.Len(); i++ {
+				ids = append(ids, _value.Index(i).FieldByName("Id").Interface().(int64))
+			}
+		}
+		return ds.container.DeleteById(object, ids)
 	}
 
-	return ds.container.Delete(object, request)
+	return fmt.Errorf("gohst.Delete() has no proper request to process.")
 }
 
 // Connect to the database
