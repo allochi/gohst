@@ -202,48 +202,53 @@ func (ds *PostJsonDataStore) Put(object interface{}) error {
 		}
 	}
 
-	// -----------
 	_kind := KindOf(object)
+
+	// Single object
 	switch _kind {
 	case Pointer2Struct:
-		_value = _value.Elem()
+		_value = reflect.ValueOf(object).Elem()
 		fallthrough
 	case Struct:
-		var tempSlice []interface{}
-		tempSlice = append(tempSlice, _value.Interface())
-		_value = reflect.ValueOf(tempSlice)
+		err := ds.saveOrUpdate(_value, _kind, tableName)
+		return err
 	}
 
-	// Write to database
-	// If Id == 0 it's a new object then use INSERT otherwise use UPDATE
-	// If pointer to object is passed then update the Id
+	// Slice of objects
 	for i := 0; i < _value.Len(); i++ {
-
-		record, err := pack(_value.Index(i))
+		err := ds.saveOrUpdate(_value.Index(i), _kind, tableName)
 		if err != nil {
-			return err
+			return nil
 		}
+	}
 
-		if record.Id == 0 {
-			if KindOf(object) == Pointer2Struct {
-				err := ds.CollectionStmts[tableName]["INSID"].QueryRow(record.Data).Scan(&record.Id)
-				if err != nil {
-					return err
-				}
-				_value.Index(i).FieldByName("Id").SetInt(record.Id)
-			} else {
-				_, err := ds.CollectionStmts[tableName]["INS"].Exec(record.Data)
-				if err != nil {
-					return err
-				}
+	return nil
+}
+
+func (ds *PostJsonDataStore) saveOrUpdate(_value reflect.Value, _kind Kind, tableName string) error {
+	record, err := pack(_value)
+	if err != nil {
+		return err
+	}
+
+	if record.Id == 0 {
+		if _kind == Pointer2SliceOfStruct || _kind == Pointer2Struct {
+			err := ds.CollectionStmts[tableName]["INSID"].QueryRow(record.Data).Scan(&record.Id)
+			if err != nil {
+				return err
 			}
+			_value.FieldByName("Id").SetInt(record.Id)
 		} else {
-			_, err := ds.CollectionStmts[tableName]["UPD"].Exec(record.Data, record.Id)
+			_, err := ds.CollectionStmts[tableName]["INS"].Exec(record.Data)
 			if err != nil {
 				return err
 			}
 		}
-
+	} else {
+		_, err := ds.CollectionStmts[tableName]["UPD"].Exec(record.Data, record.Id)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

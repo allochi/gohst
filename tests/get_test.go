@@ -14,8 +14,6 @@ import (
 	// "time"
 )
 
-var db *sql.DB
-
 func init() {
 
 	var Contactizer gohst.DataStore
@@ -24,13 +22,12 @@ func init() {
 	Contactizer, _ = gohst.GetDataStore("Contactizer")
 	Contactizer.Connect()
 
-	db, _ = sql.Open("postgres", "user=allochi dbname=allochi_contactizer sslmode=disable")
-
 }
 
 func TestGet(t *testing.T) {
 
 	Contactizer, _ := gohst.GetDataStore("Contactizer")
+	db, _ := sql.Open("postgres", "user=allochi dbname=allochi_contactizer sslmode=disable")
 
 	var contacts []Contact
 	ids := []int64{4, 5, 6, 7, 8, 9}
@@ -55,6 +52,7 @@ func TestGetById(t *testing.T) {
 
 	// Get few objects
 	Contactizer, _ := gohst.GetDataStore("Contactizer")
+	db, _ := sql.Open("postgres", "user=allochi dbname=allochi_contactizer sslmode=disable")
 
 	var contacts []Contact
 	ids := []int64{4, 5, 6, 7, 8, 9}
@@ -77,6 +75,7 @@ func TestGetAll(t *testing.T) {
 
 	// Get All objects
 	Contactizer, _ := gohst.GetDataStore("Contactizer")
+	db, _ := sql.Open("postgres", "user=allochi dbname=allochi_contactizer sslmode=disable")
 
 	var contacts []Contact
 	err := Contactizer.Get(&contacts)

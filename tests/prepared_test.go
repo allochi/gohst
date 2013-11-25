@@ -22,8 +22,6 @@ func init() {
 	Contactizer, _ = gohst.GetDataStore("Contactizer")
 	Contactizer.Connect()
 
-	db, _ = sql.Open("postgres", "user=allochi dbname=allochi_contactizer sslmode=disable")
-
 }
 
 func TestPreparedSelect(t *testing.T) {
@@ -63,6 +61,8 @@ func TestPreparedSelect(t *testing.T) {
 }
 
 func TestPreparedStatementsWithCasting(t *testing.T) {
+
+	db, _ := sql.Open("postgres", "user=allochi dbname=allochi_contactizer sslmode=disable")
 
 	var expected int
 	db, err := sql.Open("postgres", "user=allochi dbname=allochi_contactizer sslmode=disable")
