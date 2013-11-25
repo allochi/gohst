@@ -207,7 +207,6 @@ func (ds *PostJsonDataStore) Put(object interface{}) error {
 	// Single object
 	switch _kind {
 	case Pointer2Struct:
-		_value = reflect.ValueOf(object).Elem()
 		fallthrough
 	case Struct:
 		err := ds.saveOrUpdate(_value, _kind, tableName)
@@ -218,7 +217,7 @@ func (ds *PostJsonDataStore) Put(object interface{}) error {
 	for i := 0; i < _value.Len(); i++ {
 		err := ds.saveOrUpdate(_value.Index(i), _kind, tableName)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
