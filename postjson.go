@@ -309,6 +309,19 @@ func (ds *PostJsonDataStore) GetRaw(object interface{}, request Requester) (resu
 }
 
 // Delete the objects from the table based on the request
+func (ds *PostJsonDataStore) Delete(object interface{}, request Requester) (err error) {
+
+	_name, _, _ := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
+
+	sql := fmt.Sprintf("DELETE FROM %s %s", tableName, request.Bake(object))
+	_, err = ds.DB.Exec(sql)
+
+	return
+
+}
+
+// Delete the objects from the table based on the request
 // This should be faster than normal Delete, since it search by IDs and uses prepared statement
 func (ds *PostJsonDataStore) DeleteById(object interface{}, ids []int64) (err error) {
 
@@ -321,21 +334,8 @@ func (ds *PostJsonDataStore) DeleteById(object interface{}, ids []int64) (err er
 	case len(ids) == 1:
 		_, err = ds.CollectionStmts[tableName]["DELID"].Exec(ids[0])
 	case len(ids) > 1:
-		_, err = ds.CollectionStmts[tableName]["DELIN"].Exec(ids)
+		_, err = ds.CollectionStmts[tableName]["DELIN"].Exec(IN(ids))
 	}
-
-	return
-
-}
-
-// Delete the objects from the table based on the request
-func (ds *PostJsonDataStore) Delete(object interface{}, request Requester) (err error) {
-
-	_name, _, _ := TypeName(object)
-	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
-
-	sql := fmt.Sprintf("DELETE FROM %s %s", tableName, request.Bake(object))
-	_, err = ds.DB.Exec(sql)
 
 	return
 
@@ -503,4 +503,23 @@ func unpackRows(rows *sql.Rows, _type reflect.Type, _value reflect.Value) {
 		_value.Set(reflect.Append(_value, _object.Elem()))
 	}
 
+}
+
+func (ds *PostJsonDataStore) Drop(object interface{}, confirmed bool) (err error) {
+
+	_name, _, _ := TypeName(object)
+	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
+
+	sql := fmt.Sprintf("DROP TABLE %s", tableName)
+	if !confirmed {
+		sql = fmt.Sprintf("ALTER TABLE %s RENAME TO %s_%d;", tableName, tableName, time.Now().UnixNano())
+	}
+
+	_, err = ds.DB.Exec(sql)
+	if err == nil {
+		// Remove from collections
+		ds.CollectionNames[tableName] = false
+		ds.CollectionStmts[tableName] = nil
+	}
+	return
 }

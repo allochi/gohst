@@ -28,6 +28,7 @@ type DataStoreContainer interface {
 	ExecutePrepared(string, interface{}, ...interface{}) error
 	Execute(interface{}, string) error
 	ExecuteRaw(string) (string, error)
+	Drop(interface{}, bool) error
 }
 
 // When creating a data store, gohst use Register() to keep a reference by name of that store
@@ -204,14 +205,15 @@ func (ds *DataStore) Delete(object interface{}, params ...interface{}) error {
 		_value := reflect.ValueOf(object)
 		var ids []int64
 		switch _kind {
-		case _kind == Pointer2Struct:
+		case Pointer2Struct:
 			_value = _value.Elem()
 			fallthrough
-		case _kind == Struct:
+		case Struct:
 			ids = append(ids, _value.FieldByName("Id").Interface().(int64))
-		case _kind == Pointer2SliceOfStruct:
+		case Pointer2SliceOfStruct:
 			_value = _value.Elem()
-		case _kind == SliceOfStruct:
+			fallthrough
+		case SliceOfStruct:
 			for i := 0; i < _value.Len(); i++ {
 				ids = append(ids, _value.Index(i).FieldByName("Id").Interface().(int64))
 			}
@@ -278,4 +280,8 @@ func (ds *DataStore) ExecutePrepared(name string, object interface{}, values ...
 	}
 
 	return ds.container.ExecutePrepared(name, object, values...)
+}
+
+func (ds *DataStore) Drop(object interface{}, confirmed bool) error {
+	return ds.container.Drop(object, confirmed)
 }
