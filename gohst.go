@@ -177,8 +177,8 @@ func (ds *DataStore) Put(object interface{}) error {
 	if _kind != SliceOfStruct && _kind != Pointer2SliceOfStruct && _kind != Struct && _kind != Pointer2Struct {
 		return fmt.Errorf("gohst.Put() accepts struct, or a slice of struct as an object or pointer to these kinds.")
 	}
-	
-	return return ds.container.Put(object)
+
+	return ds.container.Put(object)
 }
 
 // Delete objects

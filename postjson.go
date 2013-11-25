@@ -159,6 +159,23 @@ func (ds *PostJsonDataStore) createCollection(name string) error {
 	return nil
 }
 
+func pack(_value reflect.Value) (record Record, err error) {
+
+	record.Id = _value.FieldByName("Id").Int()
+
+	data, err := json.Marshal(_value.Interface())
+	if err != nil {
+		return
+	}
+
+	record.Data = bytes.Replace(data, sqoute, sqouteESC, -1)
+	record.CreatedAt = _value.FieldByName("CreatedAt").Interface().(time.Time)
+	record.UpdatedAt = _value.FieldByName("UpdatedAt").Interface().(time.Time)
+
+	return
+
+}
+
 // Put insert or update an object to the database
 // If the object's Id == 0 then INSERT is used to insert a new object
 // If a pointer to object is passed and Id == 0 then the Id will be updated from the database
@@ -167,17 +184,6 @@ func (ds *PostJsonDataStore) Put(object interface{}) error {
 
 	_name, _, _value := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
-
-	record := Record{}
-	record.Id = _value.FieldByName("Id").Int()
-	data, err := json.Marshal(object)
-	if err != nil {
-		return err
-	}
-	record.Data = bytes.Replace(data, sqoute, sqouteESC, -1)
-
-	record.CreatedAt = _value.FieldByName("CreatedAt").Interface().(time.Time)
-	record.UpdatedAt = _value.FieldByName("UpdatedAt").Interface().(time.Time)
 
 	// Check & Create Collections
 	// If you are sure that the table exist then CheckCollections can be set to false for performance
@@ -196,31 +202,51 @@ func (ds *PostJsonDataStore) Put(object interface{}) error {
 		}
 	}
 
+	// -----------
+	_kind := KindOf(object)
+	switch _kind {
+	case Pointer2Struct:
+		_value = _value.Elem()
+		fallthrough
+	case Struct:
+		var tempSlice []interface{}
+		tempSlice = append(tempSlice, _value.Interface())
+		_value = reflect.ValueOf(tempSlice)
+	}
+
 	// Write to database
 	// If Id == 0 it's a new object then use INSERT otherwise use UPDATE
 	// If pointer to object is passed then update the Id
+	for i := 0; i < _value.Len(); i++ {
 
-	if record.Id == 0 {
-		if KindOf(object) == Pointer2Struct {
-			err = ds.CollectionStmts[tableName]["INSID"].QueryRow(record.Data).Scan(&record.Id)
-			if err != nil {
-				return err
-			}
-			_value.FieldByName("Id").SetInt(record.Id)
-		} else {
-			_, err = ds.CollectionStmts[tableName]["INS"].Exec(record.Data)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		_, err = ds.CollectionStmts[tableName]["UPD"].Exec(record.Data, record.Id)
+		record, err := pack(_value.Index(i))
 		if err != nil {
 			return err
 		}
+
+		if record.Id == 0 {
+			if KindOf(object) == Pointer2Struct {
+				err := ds.CollectionStmts[tableName]["INSID"].QueryRow(record.Data).Scan(&record.Id)
+				if err != nil {
+					return err
+				}
+				_value.Index(i).FieldByName("Id").SetInt(record.Id)
+			} else {
+				_, err := ds.CollectionStmts[tableName]["INS"].Exec(record.Data)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			_, err := ds.CollectionStmts[tableName]["UPD"].Exec(record.Data, record.Id)
+			if err != nil {
+				return err
+			}
+		}
+
 	}
 
-	return err
+	return nil
 }
 
 // Returns an an array of objects based on list of ids
