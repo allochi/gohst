@@ -73,18 +73,6 @@ func GetDataStore(name string) (ds DataStore, err error) {
 	return ds, err
 }
 
-// Put() is not as simple as it looks, it does simply put an object in the data store, but, it create
-// new one in the store if the Id=0, and if it's not, then it updates the object. Also, if the data store
-// has CheckCollections = true it will check first if the collection exists, otherwise returns an error.
-// And if AutoCreateCollections = true, then it will create one if it doesn't exist.
-func (ds *DataStore) Put(object interface{}) error {
-	_kind := KindOf(object)
-	if _kind != Struct && _kind != Pointer2Struct {
-		return fmt.Errorf("gohst.Put() only accepts an object or a pointer to an object of type struct")
-	}
-	return ds.container.Put(object)
-}
-
 // Retrieves an array of objects using their IDs. A pointer to a slice should be passed
 // with another array of IDs, the function uses the try of the slice and fill the slice with
 // retrieved objects, if the slice is not empty it will be appended. If the IDs slice is empty
@@ -178,13 +166,28 @@ func (ds *DataStore) ExecuteRaw(procedure string) (string, error) {
 	return ds.container.ExecuteRaw(procedure)
 }
 
+// Put() is not as simple as it looks, it does simply put an object in the data store, but, it create
+// new one in the store if the Id=0, and if it's not, then it updates the object. Also, if the data store
+// has CheckCollections = true it will check first if the collection exists, otherwise returns an error.
+// And if AutoCreateCollections = true, then it will create one if it doesn't exist.
+func (ds *DataStore) Put(object interface{}) error {
+
+	// object should be on struct, pointer to struct, slice of struct or pointer to slice of struct
+	_kind := KindOf(object)
+	if _kind != SliceOfStruct && _kind != Pointer2SliceOfStruct && _kind != Struct && _kind != Pointer2Struct {
+		return fmt.Errorf("gohst.Put() accepts struct, or a slice of struct as an object or pointer to these kinds.")
+	}
+	
+	return return ds.container.Put(object)
+}
+
 // Delete objects
 func (ds *DataStore) Delete(object interface{}, params ...interface{}) error {
 
 	// object should be on struct, pointer to struct, slice of struct or pointer to slice of struct
 	_kind := KindOf(object)
 	if _kind != SliceOfStruct && _kind != Pointer2SliceOfStruct && _kind != Struct && _kind != Pointer2Struct {
-		return fmt.Errorf("gohst.Delete() accepts struct, or a slice of struct as an object")
+		return fmt.Errorf("gohst.Delete() accepts struct, or a slice of struct as an object or pointer to these kinds.")
 	}
 
 	// Check the type of params
