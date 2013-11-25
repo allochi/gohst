@@ -44,7 +44,7 @@ func BenchmarkReadData(b *testing.B) {
 		// BenchmarkReadData	    5000	    266317 ns/op (3755 objects)
 		// BenchmarkReadData	   10000	    268859 ns/op (17")
 		// BenchmarkReadData	    5000	    273319 ns/op (13")
-		// BenchmarkReadData	    5000	    311151 ns/op :( on 13"
+		// BenchmarkReadData	    5000	    269193 ns/op (13") !!!
 		err := Contactizer.Get(&allContacts, []int64{9})
 
 		// BenchmarkReadData	   10000	    281835 ns/op
@@ -67,6 +67,7 @@ func BenchmarkGetAll(b *testing.B) {
 		// BenchmarkGetAll	      20	 116377441 ns/op (17")
 		// BenchmarkGetAll	      20	  78797654 ns/op (13")
 		// BenchmarkGetAll	      20	  95101618 ns/op :( on 13"
+		// BenchmarkGetAll	      20	  85590102 ns/op ~
 		err := Contactizer.Get(&allContacts)
 		if err != nil {
 			b.Fatalf("gohst error: %s", err)
@@ -89,6 +90,7 @@ func BenchmarkGetByArray(b *testing.B) {
 		// BenchmarkGetByArray	     500	   4235805 ns/op (17")
 		// BenchmarkGetByArray	     500	   2935591 ns/op (13")
 		// BenchmarkGetByArray	     500	   3406299 ns/op  :( on 13"
+		// BenchmarkGetByArray	     500	   2965511 ns/op (13") !!!
 		err := Contactizer.ExecutePrepared("SelectByCategory", &contacts, "{Governments, Donors}")
 		if err != nil {
 			b.Fatalf("gohst error: %s", err)
