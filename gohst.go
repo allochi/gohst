@@ -1,7 +1,10 @@
 package gohst
 
-import "fmt"
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+	"time"
+)
 
 type DataStore struct {
 	container DataStoreContainer
@@ -29,6 +32,7 @@ type DataStoreContainer interface {
 	Execute(interface{}, string) error
 	ExecuteRaw(string) (string, error)
 	Drop(interface{}, bool) error
+	Begin(string) (string, error)
 }
 
 // When creating a data store, gohst use Register() to keep a reference by name of that store
@@ -287,4 +291,11 @@ func (ds *DataStore) ExecutePrepared(name string, object interface{}, values ...
 
 func (ds *DataStore) Drop(object interface{}, confirmed bool) error {
 	return ds.container.Drop(object, confirmed)
+}
+
+func (ds *DataStore) Begin(name string) (string, error) {
+	if name == "" {
+		name = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return ds.container.Begin(name)
 }

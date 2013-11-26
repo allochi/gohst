@@ -4,7 +4,6 @@ import (
 	"allochi/gohst"
 	. "allochi/gohst/plays/models"
 	"fmt"
-	"time"
 )
 
 func init() {
@@ -25,25 +24,25 @@ func main() {
 		fmt.Printf("Error: %s\n", err)
 	}
 
-	numObjects := 3187
-
-	checkTime := time.Now()
-
-	for i := 0; i < numObjects; i++ {
-		var contacts []Contact
-		ids := []int64{9}
-		request := &gohst.RequestChain{}
-		request.Where(gohst.Clause{"Id", "IN", ids})
-		err = Contactizer.Get(&contacts, request)
-		// Contactizer.GetById(&contacts, ids)
-		// Contactizer.GetRawById(Contact{}, ids)
-		if err != nil {
-			fmt.Printf("Error: %s\n", err)
-		}
+	var salaries []Salary
+	trx1, err := Contactizer.Begin("StartMe")
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
 	}
 
-	duration := time.Since(checkTime)
-	fmt.Printf("[Duration for %d]: %s\n", numObjects, duration)
-	// fmt.Printf("[Duration]: %s\n", duration)
+	trx2, err := Contactizer.Begin("StartYou")
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+
+	trx3, err := Contactizer.Begin("StartYou")
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+
+	fmt.Printf("%v\n", salaries)
+	fmt.Printf("%v\n", trx1)
+	fmt.Printf("%v\n", trx2)
+	fmt.Printf("%v\n", trx3)
 
 }

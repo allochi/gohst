@@ -26,6 +26,7 @@ type PostJsonDataStore struct {
 	AutoCreateCollections bool
 	CollectionNames       map[string]bool
 	CollectionStmts       map[string]map[string]*sql.Stmt
+	Transactions          map[string]Trx
 }
 
 type Record struct {
@@ -33,6 +34,12 @@ type Record struct {
 	Data      []byte
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+type Trx struct {
+	Name      string
+	Tx        *sql.Tx
+	StartTime time.Time
 }
 
 // NewPostJson creates new store object only
@@ -43,6 +50,7 @@ func NewPostJson(DatabaseName, User, Password string) *PostJsonDataStore {
 	store.Password = Password
 	store.CollectionNames = make(map[string]bool)
 	store.CollectionStmts = make(map[string]map[string]*sql.Stmt)
+	store.Transactions = make(map[string]Trx)
 	return store
 }
 
@@ -552,4 +560,19 @@ func (ds *PostJsonDataStore) Drop(object interface{}, confirmed bool) (err error
 		ds.CollectionStmts[tableName] = nil
 	}
 	return
+}
+
+func (ds *PostJsonDataStore) Begin(name string) (string, error) {
+
+	if trx, ok := ds.Transactions[name]; ok {
+		return "", fmt.Errorf("Transaction \"%s\" already exists since %s", name, trx.StartTime)
+	}
+
+	tx, err := ds.DB.Begin()
+	if err != nil {
+		return "", fmt.Errorf("Error - Couldn't begin transaction: %s", err)
+	}
+	ds.Transactions[name] = Trx{name, tx, time.Now()}
+
+	return name, nil
 }
