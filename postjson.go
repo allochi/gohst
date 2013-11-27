@@ -156,7 +156,7 @@ func (ds *PostJsonDataStore) collectionExists(name string) (exist bool, err erro
 
 func (ds *PostJsonDataStore) createCollection(name string) error {
 
-	stmt := fmt.Sprintf(`CREATE TABLE %s ("id" SERIAL PRIMARY KEY, "data" json, "created_at" timestamp(6) NULL, "updated_at" timestamp(6) NULL)`, name)
+	stmt := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s ("id" SERIAL PRIMARY KEY, "data" json, "created_at" timestamp(6) NULL, "updated_at" timestamp(6) NULL)`, name)
 
 	_, err := ds.DB.Exec(stmt)
 	if err != nil {
@@ -562,17 +562,19 @@ func (ds *PostJsonDataStore) Drop(object interface{}, confirmed bool) (err error
 	return
 }
 
-func (ds *PostJsonDataStore) Begin(name string) (string, error) {
+func (ds *PostJsonDataStore) Begin(name string) (Trx, error) {
 
 	if trx, ok := ds.Transactions[name]; ok {
-		return "", fmt.Errorf("Transaction \"%s\" already exists since %s", name, trx.StartTime)
+		return Trx{}, fmt.Errorf("Transaction \"%s\" already exists since %s", name, trx.StartTime)
 	}
 
 	tx, err := ds.DB.Begin()
 	if err != nil {
-		return "", fmt.Errorf("Error - Couldn't begin transaction: %s", err)
+		return Trx{}, fmt.Errorf("Error - Couldn't begin transaction: %s", err)
 	}
-	ds.Transactions[name] = Trx{name, tx, time.Now()}
 
-	return name, nil
+	trx := Trx{name, tx, time.Now()}
+	ds.Transactions[name] = trx
+
+	return trx, nil
 }

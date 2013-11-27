@@ -32,7 +32,7 @@ type DataStoreContainer interface {
 	Execute(interface{}, string) error
 	ExecuteRaw(string) (string, error)
 	Drop(interface{}, bool) error
-	Begin(string) (string, error)
+	Begin(string) (Trx, error)
 }
 
 // When creating a data store, gohst use Register() to keep a reference by name of that store
@@ -293,7 +293,7 @@ func (ds *DataStore) Drop(object interface{}, confirmed bool) error {
 	return ds.container.Drop(object, confirmed)
 }
 
-func (ds *DataStore) Begin(name string) (string, error) {
+func (ds *DataStore) Begin(name string) (Trx, error) {
 	if name == "" {
 		name = fmt.Sprintf("%d", time.Now().UnixNano())
 	}
