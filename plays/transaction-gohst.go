@@ -24,25 +24,38 @@ func main() {
 		fmt.Printf("Error: %s\n", err)
 	}
 
+	Contactizer.Drop(Salary{}, true)
+
+	trx, err := Contactizer.Begin("StartMe")
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+
+	salary := Salary{}
+	salary.Name = "Allochi"
+	salary.Amount = 23000
+	Contactizer.Put__(salary, trx)
+
+	fmt.Println("-- Not with Trx")
 	var salaries []Salary
-	trx1, err := Contactizer.Begin("StartMe")
+	err = Contactizer.Get(&salaries, []int64{})
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 	}
+	for _, salary := range salaries {
+		fmt.Printf("%v\n", salary)
+	}
 
-	trx2, err := Contactizer.Begin("StartYou")
+	fmt.Println("-- With Trx")
+	salaries = []Salary{}
+	err = Contactizer.Get__(&salaries, []int64{}, trx)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 	}
-
-	trx3, err := Contactizer.Begin("StartYou")
-	if err != nil {
-		fmt.Printf("Error: %s\n", err)
+	for _, salary := range salaries {
+		fmt.Printf("%v\n", salary)
 	}
 
-	fmt.Printf("%v\n", salaries)
-	fmt.Printf("%v\n", trx1)
-	fmt.Printf("%v\n", trx2)
-	fmt.Printf("%v\n", trx3)
+	Contactizer.Commit(trx)
 
 }

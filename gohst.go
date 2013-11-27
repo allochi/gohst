@@ -19,9 +19,9 @@ func init() {
 type DataStoreContainer interface {
 	Connect() error
 	Disconnect() error
-	Put(interface{}) error
-	Get(interface{}, Requester) error
-	GetById(interface{}, []int64) error
+	Put(interface{}, Trx) error
+	Get(interface{}, Requester, Trx) error
+	GetById(interface{}, []int64, Trx) error
 	GetRawById(interface{}, []int64) (string, error)
 	GetRaw(interface{}, Requester) (string, error)
 	Delete(interface{}, Requester) error
@@ -33,6 +33,8 @@ type DataStoreContainer interface {
 	ExecuteRaw(string) (string, error)
 	Drop(interface{}, bool) error
 	Begin(string) (Trx, error)
+	Commit(Trx) error
+	Rollback(Trx) error
 }
 
 // When creating a data store, gohst use Register() to keep a reference by name of that store
@@ -90,16 +92,40 @@ func (ds *DataStore) Get(object interface{}, request interface{}) error {
 
 	// GetById
 	if reflect.TypeOf(request).String() == "[]int64" {
-		return ds.container.GetById(object, request.([]int64))
+		return ds.container.GetById(object, request.([]int64), Trx{})
 	}
 
 	// Get(request)
-	request, ok := request.(Requester)
+	requester, ok := request.(Requester)
 	if ok {
-		return ds.container.Get(object, request)
+		return ds.container.Get(object, requester, Trx{})
 	}
 
 	return fmt.Errorf("gohst.Get() has no proper request parameters to process.")
+}
+
+// Get with transaction
+func (ds *DataStore) Get__(object interface{}, request interface{}, trx Trx) error {
+
+	// return fmt.Errorf("Get__ not implemented yet!")
+
+	_objectKind := KindOf(object)
+	if _objectKind != Pointer2SliceOfStruct {
+		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
+	}
+
+	// GetById
+	if reflect.TypeOf(request).String() == "[]int64" {
+		return ds.container.GetById(object, request.([]int64), trx)
+	}
+
+	// Get(request)
+	requester, ok := request.(Requester)
+	if ok {
+		return ds.container.Get(object, requester, trx)
+	}
+
+	return fmt.Errorf("gohst.Get__() has no proper request parameters to process.")
 }
 
 // Get all objects from datastore of the type of passed slice
@@ -110,7 +136,7 @@ func (ds *DataStore) GetAll(object interface{}) error {
 		return fmt.Errorf("gohst.GetAll() accepts a pointer to slice of a struct type as an object")
 	}
 
-	return ds.container.GetById(object, []int64{})
+	return ds.container.GetById(object, []int64{}, Trx{})
 
 }
 
@@ -146,7 +172,7 @@ func (ds *DataStore) GetRaw(object interface{}, params ...interface{}) (string, 
 
 // Execute a procedure in the database and return an array of objects, the array is of the same type
 // of the passed array. Only fields that matches names between the query and the object type will be filled.
-// Execute can be used to have a mutant struct type filled by custom SQL statement
+// Execute can be used to have a custom struct type filled by custom SQL statement
 func (ds *DataStore) Execute(object interface{}, procedure string) error {
 
 	_objectKind := KindOf(object)
@@ -186,7 +212,18 @@ func (ds *DataStore) Put(object interface{}) error {
 		return fmt.Errorf("gohst.Put() accepts struct, or a slice of struct as an object or pointer to these kinds.")
 	}
 
-	return ds.container.Put(object)
+	return ds.container.Put(object, Trx{})
+}
+
+func (ds *DataStore) Put__(object interface{}, trx Trx) error {
+
+	// object should be on struct, pointer to struct, slice of struct or pointer to slice of struct
+	_kind := KindOf(object)
+	if _kind != SliceOfStruct && _kind != Pointer2SliceOfStruct && _kind != Struct && _kind != Pointer2Struct {
+		return fmt.Errorf("gohst.Put() accepts struct, or a slice of struct as an object or pointer to these kinds.")
+	}
+
+	return ds.container.Put(object, trx)
 }
 
 // Delete objects
@@ -302,4 +339,12 @@ func (ds *DataStore) Begin(name string) (Trx, error) {
 		name = fmt.Sprintf("%d", time.Now().UnixNano())
 	}
 	return ds.container.Begin(name)
+}
+
+func (ds *DataStore) Commit(trx Trx) error {
+	return ds.container.Commit(trx)
+}
+
+func (ds *DataStore) Rollback(trx Trx) error {
+	return ds.container.Rollback(trx)
 }
