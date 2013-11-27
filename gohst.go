@@ -81,33 +81,37 @@ func GetDataStore(name string) (ds DataStore, err error) {
 // with another array of IDs, the function uses the try of the slice and fill the slice with
 // retrieved objects, if the slice is not empty it will be appended. If the IDs slice is empty
 // all object in the table will be retrieved. This function doesn't check for duplicates.
-func (ds *DataStore) Get(object interface{}, params ...interface{}) error {
+func (ds *DataStore) Get(object interface{}, request interface{}) error {
 
 	_objectKind := KindOf(object)
 	if _objectKind != Pointer2SliceOfStruct {
 		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
 	}
 
-	// Check the type of params
-	if len(params) > 0 {
-		options := params[0]
-
-		// GetById
-		if reflect.TypeOf(options).String() == "[]int64" {
-			return ds.container.GetById(object, options.([]int64))
-		}
-
-		// Get(request)
-		request, ok := options.(Requester)
-		if ok {
-			return ds.container.Get(object, request)
-		}
-	} else {
-		// GetAll
-		return ds.container.GetById(object, []int64{})
+	// GetById
+	if reflect.TypeOf(request).String() == "[]int64" {
+		return ds.container.GetById(object, request.([]int64))
 	}
 
-	return fmt.Errorf("gohst.Get() has no proper request to process.")
+	// Get(request)
+	request, ok := request.(Requester)
+	if ok {
+		return ds.container.Get(object, request)
+	}
+
+	return fmt.Errorf("gohst.Get() has no proper request parameters to process.")
+}
+
+// Get all objects from datastore of the type of passed slice
+func (ds *DataStore) GetAll(object interface{}) error {
+
+	_objectKind := KindOf(object)
+	if _objectKind != Pointer2SliceOfStruct {
+		return fmt.Errorf("gohst.GetAll() accepts a pointer to slice of a struct type as an object")
+	}
+
+	return ds.container.GetById(object, []int64{})
+
 }
 
 // Works just like Get() but returns a JSON array in a string instead of objects array.
@@ -137,7 +141,7 @@ func (ds *DataStore) GetRaw(object interface{}, params ...interface{}) (string, 
 		return ds.container.GetRawById(object, []int64{})
 	}
 
-	return "", fmt.Errorf("gohst.GetRaw() has no proper request to process.")
+	return "", fmt.Errorf("gohst.GetRaw() has no proper request parameters to process.")
 }
 
 // Execute a procedure in the database and return an array of objects, the array is of the same type
@@ -228,7 +232,7 @@ func (ds *DataStore) Delete(object interface{}, params ...interface{}) error {
 		return ds.container.DeleteById(object, ids)
 	}
 
-	return fmt.Errorf("gohst.Delete() has no proper request to process.")
+	return fmt.Errorf("gohst.Delete() has no proper request parameters to process.")
 }
 
 // Connect to the database

@@ -1,9 +1,10 @@
 package main
 
 import (
+	"allochi/gohst"
 	"fmt"
 	"reflect"
-	"time"
+	// "time"
 )
 
 // Get
@@ -16,35 +17,76 @@ import (
 
 func main() {
 
-	modify("Hello")
-	modify("Hello", "World")
-	modify("Hello", time.Now())
+	// trx1 := gohst.Trx{}
+	// trx2 := gohst.Trx{}
+	// fmt.Printf("%t\n", &trx1 == &trx2)
+
+	request := &gohst.RequestChain{}
+	trx := gohst.Trx{}
+
+	var r gohst.Requester
+	var t gohst.Trx
+	var err error
+
+	r, t, err = modify(request)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+	fmt.Printf("%v %v\n", r, t)
+
+	r, t, err = modify(trx)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+	fmt.Printf("%v %v\n", r, t)
+
+	r, t, err = modify(request, trx)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+	fmt.Printf("%v %v\n", r, t)
+
+	// One Request One Trx!
+	r, t, err = modify(request, trx, trx)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+	fmt.Printf("%v %v\n", r, t)
+
+	r, t, err = modify(request, request, trx)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err)
+	}
+	fmt.Printf("%v %v\n", r, t)
 
 }
 
-func modify(params ...interface{}) {
+func modify(params ...interface{}) (request gohst.Requester, transaction gohst.Trx, err error) {
 
-	trxName := ""
-	var query interface{}
+	var r, t bool
 
-	if len(params) > 0 {
-
-		if reflect.TypeOf(params[0]).Kind() == reflect.String {
-			trxName = params[0].(string)
-		} else {
-			query = params[0]
-		}
-
-		if len(params) > 1 {
-			if reflect.TypeOf(params[1]).Kind() == reflect.String && trxName == "" {
-				trxName = params[1].(string)
-			} else {
-				query = params[1]
-			}
-		}
-
+	if len(params) > 2 {
+		return nil, gohst.Trx{}, fmt.Errorf("More than two parameters has been passed!")
 	}
 
-	fmt.Printf("found %s and %v\n", trxName, query)
+	for _, param := range params {
+		if reflect.TypeOf(param).Name() == "Trx" {
+			if t {
+				return nil, gohst.Trx{}, fmt.Errorf("More than a transaction has been passed!")
+			}
+			transaction = param.(gohst.Trx)
+			t = true
+		}
+
+		if req, ok := param.(gohst.Requester); ok {
+			if r {
+				return nil, gohst.Trx{}, fmt.Errorf("More than a request has been passed!")
+			}
+			request = req
+			r = true
+		}
+	}
+
+	return
 
 }
