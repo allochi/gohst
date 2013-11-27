@@ -64,7 +64,7 @@ func TestPutSlice(t *testing.T) {
 	err = Contactizer.Put(greekAlphabet)
 
 	var greeks []Greek
-	err = Contactizer.Get(&greeks)
+	err = Contactizer.GetAll(&greeks)
 
 	if err != nil {
 		t.Errorf("Database Error: %s", err)
@@ -91,7 +91,7 @@ func TestPutPointers(t *testing.T) {
 	err = Contactizer.Put(&greekAlphabet)
 
 	var greeks []Greek
-	err = Contactizer.Get(&greeks)
+	err = Contactizer.GetAll(&greeks)
 
 	if err != nil {
 		t.Errorf("Database Error: %s", err)
@@ -128,7 +128,7 @@ func TestPutUpdate(t *testing.T) {
 	}
 
 	var greeks []Greek
-	err = Contactizer.Get(&greeks)
+	err = Contactizer.GetAll(&greeks)
 	if err != nil {
 		t.Errorf("Database Error: %s", err)
 	}
@@ -143,7 +143,7 @@ func TestPutUpdate(t *testing.T) {
 	}
 
 	var ugreeks []Greek
-	err = Contactizer.Get(&ugreeks)
+	err = Contactizer.GetAll(&ugreeks)
 
 	expected := len(greekAlphabet)
 	got := len(ugreeks)

@@ -368,13 +368,17 @@ func (ds *PostJsonDataStore) GetRaw(object interface{}, request Requester) (resu
 }
 
 // Delete the objects from the table based on the request
-func (ds *PostJsonDataStore) Delete(object interface{}, request Requester) (err error) {
+func (ds *PostJsonDataStore) Delete(object interface{}, request Requester, trx Trx) (err error) {
 
 	_name, _, _ := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
 
 	sql := fmt.Sprintf("DELETE FROM %s %s", tableName, request.Bake(object))
-	_, err = ds.DB.Exec(sql)
+	if trx.Tx != nil {
+		_, err = trx.Tx.Exec(sql)
+	} else {
+		_, err = ds.DB.Exec(sql)
+	}
 
 	return
 
@@ -382,7 +386,7 @@ func (ds *PostJsonDataStore) Delete(object interface{}, request Requester) (err 
 
 // Delete the objects from the table based on the request
 // This should be faster than normal Delete, since it search by IDs and uses prepared statement
-func (ds *PostJsonDataStore) DeleteById(object interface{}, ids []int64) (err error) {
+func (ds *PostJsonDataStore) DeleteById(object interface{}, ids []int64, trx Trx) (err error) {
 
 	_name, _, _ := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
@@ -391,9 +395,17 @@ func (ds *PostJsonDataStore) DeleteById(object interface{}, ids []int64) (err er
 	case len(ids) == 0:
 		err = fmt.Errorf("Delete can't have empty id list")
 	case len(ids) == 1:
-		_, err = ds.CollectionStmts[tableName]["DELID"].Exec(ids[0])
+		if trx.Tx != nil {
+			_, err = trx.Tx.Stmt(ds.CollectionStmts[tableName]["DELID"]).Exec(ids[0])
+		} else {
+			_, err = ds.CollectionStmts[tableName]["DELID"].Exec(ids[0])
+		}
 	case len(ids) > 1:
-		_, err = ds.CollectionStmts[tableName]["DELIN"].Exec(IN(ids))
+		if trx.Tx != nil {
+			_, err = trx.Tx.Stmt(ds.CollectionStmts[tableName]["DELIN"]).Exec(IN(ids))
+		} else {
+			_, err = ds.CollectionStmts[tableName]["DELIN"].Exec(IN(ids))
+		}
 	}
 
 	return

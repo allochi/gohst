@@ -24,8 +24,8 @@ type DataStoreContainer interface {
 	GetById(interface{}, []int64, Trx) error
 	GetRawById(interface{}, []int64) (string, error)
 	GetRaw(interface{}, Requester) (string, error)
-	Delete(interface{}, Requester) error
-	DeleteById(interface{}, []int64) error
+	Delete(interface{}, Requester, Trx) error
+	DeleteById(interface{}, []int64, Trx) error
 	Index(interface{}, string) error
 	Prepare(string, interface{}, Requester) error
 	ExecutePrepared(string, interface{}, ...interface{}) error
@@ -84,30 +84,11 @@ func GetDataStore(name string) (ds DataStore, err error) {
 // retrieved objects, if the slice is not empty it will be appended. If the IDs slice is empty
 // all object in the table will be retrieved. This function doesn't check for duplicates.
 func (ds *DataStore) Get(object interface{}, request interface{}) error {
-
-	_objectKind := KindOf(object)
-	if _objectKind != Pointer2SliceOfStruct {
-		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
-	}
-
-	// GetById
-	if reflect.TypeOf(request).String() == "[]int64" {
-		return ds.container.GetById(object, request.([]int64), Trx{})
-	}
-
-	// Get(request)
-	requester, ok := request.(Requester)
-	if ok {
-		return ds.container.Get(object, requester, Trx{})
-	}
-
-	return fmt.Errorf("gohst.Get() has no proper request parameters to process.")
+	return ds.Get__(object, request, Trx{})
 }
 
 // Get with transaction
 func (ds *DataStore) Get__(object interface{}, request interface{}, trx Trx) error {
-
-	// return fmt.Errorf("Get__ not implemented yet!")
 
 	_objectKind := KindOf(object)
 	if _objectKind != Pointer2SliceOfStruct {
@@ -174,6 +155,11 @@ func (ds *DataStore) GetRaw(object interface{}, params ...interface{}) (string, 
 // of the passed array. Only fields that matches names between the query and the object type will be filled.
 // Execute can be used to have a custom struct type filled by custom SQL statement
 func (ds *DataStore) Execute(object interface{}, procedure string) error {
+	return ds.Execute(object, procedure, Trx{})
+}
+
+// Execute with Trx
+func (ds *DataStore) Execute__(object interface{}, procedure string, trx Trx) error {
 
 	_objectKind := KindOf(object)
 	if _objectKind != Pointer2SliceOfStruct {
@@ -184,7 +170,7 @@ func (ds *DataStore) Execute(object interface{}, procedure string) error {
 		return fmt.Errorf("gohst.Execute() requires procedure name as a string")
 	}
 
-	return ds.container.Execute(object, procedure)
+	return ds.container.Execute(object, procedure, trx)
 }
 
 // Works just like Execute() but returns a JSON array in a string instead of objects array.
@@ -205,14 +191,7 @@ func (ds *DataStore) ExecuteRaw(procedure string) (string, error) {
 // has CheckCollections = true it will check first if the collection exists, otherwise returns an error.
 // And if AutoCreateCollections = true, then it will create one if it doesn't exist.
 func (ds *DataStore) Put(object interface{}) error {
-
-	// object should be on struct, pointer to struct, slice of struct or pointer to slice of struct
-	_kind := KindOf(object)
-	if _kind != SliceOfStruct && _kind != Pointer2SliceOfStruct && _kind != Struct && _kind != Pointer2Struct {
-		return fmt.Errorf("gohst.Put() accepts struct, or a slice of struct as an object or pointer to these kinds.")
-	}
-
-	return ds.container.Put(object, Trx{})
+	return ds.Put(object, Trx{})
 }
 
 func (ds *DataStore) Put__(object interface{}, trx Trx) error {
@@ -228,6 +207,11 @@ func (ds *DataStore) Put__(object interface{}, trx Trx) error {
 
 // Delete objects
 func (ds *DataStore) Delete(object interface{}, params ...interface{}) error {
+	return ds.Delete__(object, params, Trx{})
+}
+
+// Delete objects
+func (ds *DataStore) Delete__(object interface{}, params ...interface{}, trx Trx) error {
 
 	// object should be on struct, pointer to struct, slice of struct or pointer to slice of struct
 	_kind := KindOf(object)
@@ -241,13 +225,13 @@ func (ds *DataStore) Delete(object interface{}, params ...interface{}) error {
 
 		// DeleteById
 		if reflect.TypeOf(options).String() == "[]int64" {
-			return ds.container.DeleteById(object, options.([]int64))
+			return ds.container.DeleteById(object, options.([]int64), trx)
 		}
 
 		// Delete(request)
 		request, ok := options.(Requester)
 		if ok {
-			return ds.container.Delete(object, request)
+			return ds.container.Delete(object, request, trx)
 		}
 	} else {
 		_value := reflect.ValueOf(object)
@@ -266,7 +250,7 @@ func (ds *DataStore) Delete(object interface{}, params ...interface{}) error {
 				ids = append(ids, _value.Index(i).FieldByName("Id").Interface().(int64))
 			}
 		}
-		return ds.container.DeleteById(object, ids)
+		return ds.container.DeleteById(object, ids, trx)
 	}
 
 	return fmt.Errorf("gohst.Delete() has no proper request parameters to process.")

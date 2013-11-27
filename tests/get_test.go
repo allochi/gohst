@@ -78,7 +78,7 @@ func TestGetAll(t *testing.T) {
 	db, _ := sql.Open("postgres", "user=allochi dbname=allochi_contactizer sslmode=disable")
 
 	var contacts []Contact
-	err := Contactizer.Get(&contacts)
+	err := Contactizer.GetAll(&contacts)
 
 	if err != nil {
 		t.Errorf("Database Error: %s", err)
