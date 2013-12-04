@@ -131,8 +131,8 @@ func (ds *PostJsonDataStore) loadFunctions() (err error) {
 	}
 
 	if count < len(functions) {
-		for _, sql := range functions {
-			_, err = ds.DB.Exec(sql)
+		for _, _sql := range functions {
+			_, err = ds.DB.Exec(_sql)
 			if err != nil {
 				return
 			}
@@ -188,7 +188,7 @@ func pack(_value reflect.Value) (record Record, err error) {
 // If the object's Id == 0 then INSERT is used to insert a new object
 // If a pointer to object is passed and Id == 0 then the Id will be updated from the database
 // If Id != 0 then UPDATE is used and the object is updated
-func (ds *PostJsonDataStore) Put(object interface{}, trx Trx) error {
+func (ds *PostJsonDataStore) Put(trx Trx, object interface{}) error {
 
 	_name, _, _value := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
@@ -233,6 +233,7 @@ func (ds *PostJsonDataStore) Put(object interface{}, trx Trx) error {
 }
 
 func (ds *PostJsonDataStore) saveOrUpdate(_value reflect.Value, _kind Kind, tableName string, trx Trx) (err error) {
+
 	record, err := pack(_value)
 	if err != nil {
 		return
@@ -240,28 +241,20 @@ func (ds *PostJsonDataStore) saveOrUpdate(_value reflect.Value, _kind Kind, tabl
 
 	if record.Id == 0 {
 		if _kind == Pointer2SliceOfStruct || _kind == Pointer2Struct {
-			if trx.Tx != nil {
-				err = trx.Tx.Stmt(ds.CollectionStmts[tableName]["INSID"]).QueryRow(record.Data).Scan(&record.Id)
-			} else {
-				err = ds.CollectionStmts[tableName]["INSID"].QueryRow(record.Data).Scan(&record.Id)
+			row, serr := ds.queryRowStmt(trx, tableName, "INSID", record.Data)
+			if serr != nil {
+				return
 			}
+			err = row.Scan(&record.Id)
 			if err != nil {
 				return
 			}
 			_value.FieldByName("Id").SetInt(record.Id)
 		} else {
-			if trx.Tx != nil {
-				_, err = trx.Tx.Stmt(ds.CollectionStmts[tableName]["INS"]).Exec(record.Data)
-			} else {
-				_, err = ds.CollectionStmts[tableName]["INS"].Exec(record.Data)
-			}
+			_, err = ds.execStmt(trx, tableName, "INS", record.Data)
 		}
 	} else {
-		if trx.Tx != nil {
-			_, err = trx.Tx.Stmt(ds.CollectionStmts[tableName]["UPD"]).Exec(record.Data, record.Id)
-		} else {
-			_, err = ds.CollectionStmts[tableName]["UPD"].Exec(record.Data, record.Id)
-		}
+		_, err = ds.execStmt(trx, tableName, "UPD", record.Data, record.Id)
 	}
 
 	return nil
@@ -269,7 +262,7 @@ func (ds *PostJsonDataStore) saveOrUpdate(_value reflect.Value, _kind Kind, tabl
 
 // Returns an an array of objects based on list of ids
 // This should be faster than normal Get, since it search by IDs and uses prepared statement
-func (ds *PostJsonDataStore) GetById(object interface{}, ids []int64, trx Trx) (err error) {
+func (ds *PostJsonDataStore) GetById(trx Trx, object interface{}, ids []int64) (err error) {
 
 	_name, _type, _value := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
@@ -309,18 +302,14 @@ func (ds *PostJsonDataStore) GetById(object interface{}, ids []int64, trx Trx) (
 }
 
 // Returns an an array of objects based on a request
-func (ds *PostJsonDataStore) Get(object interface{}, request Requester, trx Trx) (err error) {
+func (ds *PostJsonDataStore) Get(trx Trx, object interface{}, request Requester) (err error) {
 
 	_name, _type, _value := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
 
 	var rows *sql.Rows
-	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake(object))
-	if trx.Tx != nil {
-		rows, err = trx.Tx.Query(sql)
-	} else {
-		rows, err = ds.DB.Query(sql)
-	}
+	_sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake(object))
+	rows, err = ds.query(trx, _sql)
 
 	if err != nil {
 		return
@@ -360,25 +349,21 @@ func (ds *PostJsonDataStore) GetRaw(object interface{}, request Requester) (resu
 	_name, _, _ := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
 
-	sql := fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s %s) row_data;", tableName, request.Bake(object))
-	err = ds.DB.QueryRow(sql).Scan(&result)
+	_sql := fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s %s) row_data;", tableName, request.Bake(object))
+	err = ds.DB.QueryRow(_sql).Scan(&result)
 
 	return
 
 }
 
 // Delete the objects from the table based on the request
-func (ds *PostJsonDataStore) Delete(object interface{}, request Requester, trx Trx) (err error) {
+func (ds *PostJsonDataStore) Delete(trx Trx, object interface{}, request Requester) (err error) {
 
 	_name, _, _ := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
 
-	sql := fmt.Sprintf("DELETE FROM %s %s", tableName, request.Bake(object))
-	if trx.Tx != nil {
-		_, err = trx.Tx.Exec(sql)
-	} else {
-		_, err = ds.DB.Exec(sql)
-	}
+	_sql := fmt.Sprintf("DELETE FROM %s %s", tableName, request.Bake(object))
+	_, err = ds.exec(trx, _sql)
 
 	return
 
@@ -386,7 +371,7 @@ func (ds *PostJsonDataStore) Delete(object interface{}, request Requester, trx T
 
 // Delete the objects from the table based on the request
 // This should be faster than normal Delete, since it search by IDs and uses prepared statement
-func (ds *PostJsonDataStore) DeleteById(object interface{}, ids []int64, trx Trx) (err error) {
+func (ds *PostJsonDataStore) DeleteById(trx Trx, object interface{}, ids []int64) (err error) {
 
 	_name, _, _ := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
@@ -395,17 +380,9 @@ func (ds *PostJsonDataStore) DeleteById(object interface{}, ids []int64, trx Trx
 	case len(ids) == 0:
 		err = fmt.Errorf("Delete can't have empty id list")
 	case len(ids) == 1:
-		if trx.Tx != nil {
-			_, err = trx.Tx.Stmt(ds.CollectionStmts[tableName]["DELID"]).Exec(ids[0])
-		} else {
-			_, err = ds.CollectionStmts[tableName]["DELID"].Exec(ids[0])
-		}
+		_, err = ds.execStmt(trx, tableName, "DELID", ids[0])
 	case len(ids) > 1:
-		if trx.Tx != nil {
-			_, err = trx.Tx.Stmt(ds.CollectionStmts[tableName]["DELIN"]).Exec(IN(ids))
-		} else {
-			_, err = ds.CollectionStmts[tableName]["DELIN"].Exec(IN(ids))
-		}
+		_, err = ds.execStmt(trx, tableName, "DELIN", IN(ids))
 	}
 
 	return
@@ -472,36 +449,37 @@ func (ds *PostJsonDataStore) Index(object interface{}, field string) error {
 		field = _json
 	}
 
-	sql := ""
+	_sql := ""
 	if strings.Contains(_type, "[]") {
-		sql = fmt.Sprintf("CREATE INDEX _array_%s_%s_idx ON %s USING GIN (%s(data,'%s'));", tableName, field, tableName, "_array", field)
+		_sql = fmt.Sprintf("CREATE INDEX _array_%s_%s_idx ON %s USING GIN (%s(data,'%s'));", tableName, field, tableName, "_array", field)
 	} else {
 		switch _type {
 		case "string":
-			sql = fmt.Sprintf("CREATE INDEX %s_%s_idx ON %s(((data->>'%s')::%s));", tableName, field, tableName, field, SQLTypes[_type])
+			_sql = fmt.Sprintf("CREATE INDEX %s_%s_idx ON %s(((data->>'%s')::%s));", tableName, field, tableName, field, SQLTypes[_type])
 		case "time.Time":
-			sql = fmt.Sprintf("CREATE INDEX %s_%s_idx ON %s(_date(data,'%s'));", tableName, field, tableName, field)
+			_sql = fmt.Sprintf("CREATE INDEX %s_%s_idx ON %s(_date(data,'%s'));", tableName, field, tableName, field)
 		}
 	}
 	// simple field (int, float, string, date)
 	// array (string, float, array, date)
 
-	// fmt.Println(sql)
-	ds.DB.Exec(sql)
+	// fmt.Println(_sql)
+	ds.DB.Exec(_sql)
 	return nil
 }
 
-func (ds *PostJsonDataStore) Execute(object interface{}, procedure string) (err error) {
+func (ds *PostJsonDataStore) Query(trx Trx, object interface{}, query string) (err error) {
 
 	_, _type, _value := TypeName(object)
 
-	// TODO: SQL injection!
+	_sql := fmt.Sprintf("SELECT * FROM %s;", query)
+	var rows *sql.Rows
+	rows, err = ds.query(trx, _sql)
 
-	sql := fmt.Sprintf("SELECT * FROM %s;", procedure)
-	rows, err := ds.DB.Query(sql)
 	if err != nil {
 		return
 	}
+
 	defer rows.Close()
 
 	unpackRows(rows, _type, _value)
@@ -509,11 +487,12 @@ func (ds *PostJsonDataStore) Execute(object interface{}, procedure string) (err 
 	return
 }
 
-func (ds *PostJsonDataStore) ExecuteRaw(procedure string) (result string, err error) {
-	// TODO: SQL injection!
-	sql := fmt.Sprintf("select array_to_json(array_agg(row_to_json(row_data))) from (SELECT * FROM %s) row_data;", procedure)
-	err = ds.DB.QueryRow(sql).Scan(&result)
+func (ds *PostJsonDataStore) QueryRaw(query string) (result string, err error) {
+
+	_sql := fmt.Sprintf("SELECT array_to_json(array_agg(row_to_json(row_data))) FROM (SELECT * FROM %s) row_data;", query)
+	err = ds.DB.QueryRow(_sql).Scan(&result)
 	return
+
 }
 
 func (ds *PostJsonDataStore) Prepare(name string, object interface{}, request Requester) error {
@@ -525,10 +504,10 @@ func (ds *PostJsonDataStore) Prepare(name string, object interface{}, request Re
 		return fmt.Errorf("gohst.Prepare [%s][%s] statement already exist", tableName, name)
 	}
 
-	sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake(object))
-	prepared, err := ds.DB.Prepare(sql)
+	_sql := fmt.Sprintf("SELECT * FROM %s %s", tableName, request.Bake(object))
+	prepared, err := ds.DB.Prepare(_sql)
 	if err != nil {
-		fmt.Printf("gohst.PostJson.Prepare: %s\nQuery: %s", err, sql)
+		fmt.Printf("gohst.PostJson.Prepare: %s\nQuery: %s", err, _sql)
 	}
 	ds.CollectionStmts[tableName][name] = prepared
 
@@ -536,18 +515,13 @@ func (ds *PostJsonDataStore) Prepare(name string, object interface{}, request Re
 
 }
 
-func (ds *PostJsonDataStore) ExecutePrepared(name string, object interface{}, values ...interface{}) (err error) {
+func (ds *PostJsonDataStore) ExecutePrepared(trx Trx, name string, object interface{}, values ...interface{}) (err error) {
 
 	_name, _type, _value := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
 
-	prepared := ds.CollectionStmts[tableName][name]
-	if prepared == nil {
-		return fmt.Errorf("gohst.ExecutePrepared [%s][%s] statement doesn't exist", tableName, name)
-	}
-
 	var rows *sql.Rows
-	rows, err = prepared.Query(values...)
+	rows, err = ds.queryStmt(trx, tableName, name, values...)
 
 	if err != nil {
 		return
@@ -581,12 +555,12 @@ func (ds *PostJsonDataStore) Drop(object interface{}, confirmed bool) (err error
 	_name, _, _ := TypeName(object)
 	tableName := "json_" + inflect.Pluralize(inflect.Underscore(_name))
 
-	sql := fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
+	_sql := fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
 	if !confirmed {
-		sql = fmt.Sprintf("ALTER TABLE IF EXISTS %s RENAME TO %s_%d;", tableName, tableName, time.Now().UnixNano())
+		_sql = fmt.Sprintf("ALTER TABLE IF EXISTS %s RENAME TO %s_%d;", tableName, tableName, time.Now().UnixNano())
 	}
 
-	_, err = ds.DB.Exec(sql)
+	_, err = ds.DB.Exec(_sql)
 	if err == nil {
 		// Remove from collections
 		delete(ds.CollectionNames, tableName)
@@ -634,4 +608,71 @@ func (ds *PostJsonDataStore) Rollback(trx Trx) error {
 		return nil
 	}
 	return fmt.Errorf("Couldn't find the Trx in the transactions map")
+}
+
+// datastore query
+func (ds *PostJsonDataStore) query(trx Trx, _sql string, params ...interface{}) (rows *sql.Rows, err error) {
+	if trx.Tx != nil {
+		rows, err = trx.Tx.Query(_sql, params...)
+	} else {
+		rows, err = ds.DB.Query(_sql, params...)
+	}
+	return
+}
+
+func (ds *PostJsonDataStore) queryStmt(trx Trx, tableName string, stmtName string, params ...interface{}) (rows *sql.Rows, err error) {
+	stmt := ds.CollectionStmts[tableName][stmtName]
+	if stmt == nil {
+		return nil, fmt.Errorf("Prepared statement [%s][%s] statement doesn't exist", tableName, stmtName)
+	}
+	if trx.Tx != nil {
+		rows, err = trx.Tx.Stmt(stmt).Query(params...)
+	} else {
+		rows, err = stmt.Query(params...)
+	}
+	return
+}
+
+func (ds *PostJsonDataStore) exec(trx Trx, _sql string, params ...interface{}) (result sql.Result, err error) {
+	if trx.Tx != nil {
+		result, err = trx.Tx.Exec(_sql, params...)
+	} else {
+		result, err = ds.DB.Exec(_sql, params...)
+	}
+	return
+}
+
+func (ds *PostJsonDataStore) execStmt(trx Trx, tableName string, stmtName string, params ...interface{}) (result sql.Result, err error) {
+	stmt := ds.CollectionStmts[tableName][stmtName]
+	if stmt == nil {
+		return nil, fmt.Errorf("Prepared statement [%s][%s] statement doesn't exist", tableName, stmtName)
+	}
+	if trx.Tx != nil {
+		result, err = trx.Tx.Stmt(stmt).Exec(params...)
+	} else {
+		result, err = stmt.Exec(params...)
+	}
+	return
+}
+
+func (ds *PostJsonDataStore) queryRow(trx Trx, _sql string, params ...interface{}) (row *sql.Row) {
+	if trx.Tx != nil {
+		row = trx.Tx.QueryRow(_sql, params...)
+	} else {
+		row = ds.DB.QueryRow(_sql, params...)
+	}
+	return
+}
+
+func (ds *PostJsonDataStore) queryRowStmt(trx Trx, tableName string, stmtName string, params ...interface{}) (row *sql.Row, err error) {
+	stmt := ds.CollectionStmts[tableName][stmtName]
+	if stmt == nil {
+		return nil, fmt.Errorf("Prepared statement [%s][%s] statement doesn't exist", tableName, stmtName)
+	}
+	if trx.Tx != nil {
+		row = trx.Tx.Stmt(stmt).QueryRow(params...)
+	} else {
+		row = stmt.QueryRow(params...)
+	}
+	return
 }

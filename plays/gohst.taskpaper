@@ -1,0 +1,65 @@
+PostJSON PUT:
+	- Create the store if it doesn't exist (expensive! Maybe should be configured somewhere)
+	- Allow duplicated objects in case of "AutoGenerateID:false"
+		- Version tables, data dumps, logs of some kind
+		- Queried by last "CreatedAt"
+Index & Query:
+	- Create an index by field @done
+		- gohst.INDEX("Datastore","Table", "Field) @done
+		- Contact.INDEX("FirstName") - Create index for FirstName @done
+		- Contact.INDEX("FirstName", "LastName") - Create index for FirstName+LastName @done
+		- Change "Entry" to "Clause"? @done
+Test:
+	- Perfomance: Load data from NHIS into gohst and into normal table
+Important:
+	- Add script to add the _array and _date to the database if they don't exist @done
+	- Add code to convert a Go array to Postgresql JSON array in request @done
+		- request.Where(gohst.Clause{"Tags", "<@", "{Oslo}"}) to request.Where(gohst.Clause{"Tags", "<@", cities}) @done
+	- Delete() needs to be able to take object, array or request? @done
+	- Put() should take one object in the form of Put(&object) or a slice in the form of Put(&objects) @done
+	- There is a problem with the _array, it doesn't remove all the " @done
+There is a solution for this, but only for text values, it's more practical, just process the array as string, remove replace [] with {} and then cast as ::text[]
+	- There is a problem with prepared statment being not found
+	- look into cuncurrency problems that map may cause in gohst and postjson
+Transactions:
+	- Begin returns Trx object instead of string @done
+		- Trx contains Tx object @done
+		- Trx registered in the container to be retrieved by gohst.GetTrx("addUser")
+	- Trx objects get passed to Get(), Put() and Delete() (for now) @done
+		- Get__, Put__... @done
+	- Move Trx to be first
+
+Execute:
+	- Check out the whole concept @done
+	- Make sure no SQL injection @done
+ Direct Field Read/Update:
+	All of these are done in SQL level for perfomance!!!
+	Update Format:
+		- [By Request] Contactizer.Update(Contact{}, request, "FirstName", "Allochi")
+		- [By Ids] Contactizer.Update(Contact{}, []int64{10}, "FirstName", "Allochi") 
+		- [Multible Fields] Contactizer.Update(Contact{}, request, []string{"FirstName","CountryId"}, "Allochi", 10) 
+		- [Array Fields] Contactizer.Update(Contact{}, request, "Categories", []string{"A","B","C"}) 
+		- [By Trx] Contactizer.Update__(trx, Contact{}, request, "Categories", []string{"A","B","C"})
+	- Will require SQL functions for efficiency and perfomance
+	Read Format:
+		- [Select first row only?] Contactizer.Select(Contact{}, request, "FirstName", &FirstName)
+		- Contactizer.Select(Contact{}, request, []string{"FirstName","LastName"}, &firstName, &lastName)
+		- var FirstNames []string; Contactizer.Select(Contact{}, request, "FirstName", &FirstNames)
+		- var FirstNames []string; Contactizer.SelectDistinct(Contact{}, request, "FirstName", &FirstNames)
+			- This one is a special signature
+			- SelectDistinct(object, request or ids, string field name, address of an array)
+Archive:
+	- AutoCreateStore: true/false - if "false" PUT throw "store doesn't exist error" @done @project(PostJSON PUT)
+	- Auto-Generate IDs @done @project(PostJSON PUT)
+		- AutoGenerateID: true/false - if "false" then ID field is not a sequence! (in case of logs and data-dumps) @done
+	- PUT returns the new object ID @done @project(PostJSON PUT)
+		- Two conditions @done
+			- Set "ReturnNewObjectID:true" @done
+			- If the passed interface is a pointer then the object is modified @done
+	- All SQL command go to an "SQLCOMD" array for that request object @done @project(Query Execution)
+	- SQLCOMD array can include things like: @done @project(Query Execution)
+		- Check if the table exist @done
+		- Create the collection/table if not exist @done
+		- SELECT/INSERT/UPDATE commands in their order by insertion in array @done
+		- This should help build a structured command to the database layer @done
+	-  @done @project(Query Execution)

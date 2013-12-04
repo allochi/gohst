@@ -62,7 +62,7 @@ func TestTrxScopeAndRollback(t *testing.T) {
 	salary := Salary{}
 	salary.Name = "Allochi"
 	salary.Amount = 120
-	Contactizer.Put__(salary, trx)
+	Contactizer.Put__(trx, salary)
 
 	// -- Get outside Trx
 	var salaries []Salary
@@ -77,7 +77,7 @@ func TestTrxScopeAndRollback(t *testing.T) {
 
 	// -- Get inside Trx
 	salaries = []Salary{}
-	err = Contactizer.Get__(&salaries, []int64{}, trx)
+	err = Contactizer.Get__(trx, &salaries, []int64{})
 	if err != nil {
 		t.Errorf("Error: %s\n", err)
 	}

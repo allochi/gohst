@@ -19,18 +19,18 @@ func init() {
 type DataStoreContainer interface {
 	Connect() error
 	Disconnect() error
-	Put(interface{}, Trx) error
-	Get(interface{}, Requester, Trx) error
-	GetById(interface{}, []int64, Trx) error
+	Put(Trx, interface{}) error
+	Get(Trx, interface{}, Requester) error
+	GetById(Trx, interface{}, []int64) error
 	GetRawById(interface{}, []int64) (string, error)
 	GetRaw(interface{}, Requester) (string, error)
-	Delete(interface{}, Requester, Trx) error
-	DeleteById(interface{}, []int64, Trx) error
+	Delete(Trx, interface{}, Requester) error
+	DeleteById(Trx, interface{}, []int64) error
 	Index(interface{}, string) error
 	Prepare(string, interface{}, Requester) error
-	ExecutePrepared(string, interface{}, ...interface{}) error
-	Execute(interface{}, string) error
-	ExecuteRaw(string) (string, error)
+	ExecutePrepared(Trx, string, interface{}, ...interface{}) error
+	Query(Trx, interface{}, string) error
+	QueryRaw(string) (string, error)
 	Drop(interface{}, bool) error
 	Begin(string) (Trx, error)
 	Commit(Trx) error
@@ -84,11 +84,11 @@ func GetDataStore(name string) (ds DataStore, err error) {
 // retrieved objects, if the slice is not empty it will be appended. If the IDs slice is empty
 // all object in the table will be retrieved. This function doesn't check for duplicates.
 func (ds *DataStore) Get(object interface{}, request interface{}) error {
-	return ds.Get__(object, request, Trx{})
+	return ds.Get__(Trx{}, object, request)
 }
 
 // Get with transaction
-func (ds *DataStore) Get__(object interface{}, request interface{}, trx Trx) error {
+func (ds *DataStore) Get__(trx Trx, object interface{}, request interface{}) error {
 
 	_objectKind := KindOf(object)
 	if _objectKind != Pointer2SliceOfStruct {
@@ -97,13 +97,13 @@ func (ds *DataStore) Get__(object interface{}, request interface{}, trx Trx) err
 
 	// GetById
 	if reflect.TypeOf(request).String() == "[]int64" {
-		return ds.container.GetById(object, request.([]int64), trx)
+		return ds.container.GetById(trx, object, request.([]int64))
 	}
 
 	// Get(request)
 	requester, ok := request.(Requester)
 	if ok {
-		return ds.container.Get(object, requester, trx)
+		return ds.container.Get(trx, object, requester)
 	}
 
 	return fmt.Errorf("gohst.Get__() has no proper request parameters to process.")
@@ -117,7 +117,7 @@ func (ds *DataStore) GetAll(object interface{}) error {
 		return fmt.Errorf("gohst.GetAll() accepts a pointer to slice of a struct type as an object")
 	}
 
-	return ds.container.GetById(object, []int64{}, Trx{})
+	return ds.container.GetById(Trx{}, object, []int64{})
 
 }
 
@@ -151,39 +151,39 @@ func (ds *DataStore) GetRaw(object interface{}, params ...interface{}) (string, 
 	return "", fmt.Errorf("gohst.GetRaw() has no proper request parameters to process.")
 }
 
-// Execute a procedure in the database and return an array of objects, the array is of the same type
+// Query the database and return an array of objects, the array is of the same type
 // of the passed array. Only fields that matches names between the query and the object type will be filled.
-// Execute can be used to have a custom struct type filled by custom SQL statement
-func (ds *DataStore) Execute(object interface{}, procedure string) error {
-	return ds.Execute(object, procedure, Trx{})
+// Query can be used to have a custom struct type filled by custom SQL statement
+func (ds *DataStore) Query(object interface{}, query string) error {
+	return ds.Query__(Trx{}, object, query)
 }
 
-// Execute with Trx
-func (ds *DataStore) Execute__(object interface{}, procedure string, trx Trx) error {
+// Query with Trx
+func (ds *DataStore) Query__(trx Trx, object interface{}, query string) error {
 
 	_objectKind := KindOf(object)
 	if _objectKind != Pointer2SliceOfStruct {
 		return fmt.Errorf("gohst.Get() accepts a pointer to slice of a struct type as an object")
 	}
 
-	if procedure == "" {
-		return fmt.Errorf("gohst.Execute() requires procedure name as a string")
+	if query == "" {
+		return fmt.Errorf("gohst.Query() requires query name as a string")
 	}
 
-	return ds.container.Execute(object, procedure, trx)
+	return ds.container.Query(trx, object, query)
 }
 
-// Works just like Execute() but returns a JSON array in a string instead of objects array.
-// This is more fixable than Execute() since the SQL statement in function can hold any number
+// Works just like Query() but returns a JSON array in a string instead of objects array.
+// This is more fixable than Query() since the SQL statement in function can hold any number
 // of fields from multiple tables join, make sure to name them properly in case of aggregations
 // and joins
-func (ds *DataStore) ExecuteRaw(procedure string) (string, error) {
+func (ds *DataStore) QueryRaw(query string) (string, error) {
 
-	if procedure == "" {
-		return "", fmt.Errorf("gohst.ExecuteRaw() requires procedure name as a string")
+	if query == "" {
+		return "", fmt.Errorf("gohst.QueryRaw() requires query name as a string")
 	}
 
-	return ds.container.ExecuteRaw(procedure)
+	return ds.container.QueryRaw(query)
 }
 
 // Put() is not as simple as it looks, it does simply put an object in the data store, but, it create
@@ -191,10 +191,10 @@ func (ds *DataStore) ExecuteRaw(procedure string) (string, error) {
 // has CheckCollections = true it will check first if the collection exists, otherwise returns an error.
 // And if AutoCreateCollections = true, then it will create one if it doesn't exist.
 func (ds *DataStore) Put(object interface{}) error {
-	return ds.Put(object, Trx{})
+	return ds.Put__(Trx{}, object)
 }
 
-func (ds *DataStore) Put__(object interface{}, trx Trx) error {
+func (ds *DataStore) Put__(trx Trx, object interface{}) error {
 
 	// object should be on struct, pointer to struct, slice of struct or pointer to slice of struct
 	_kind := KindOf(object)
@@ -202,16 +202,16 @@ func (ds *DataStore) Put__(object interface{}, trx Trx) error {
 		return fmt.Errorf("gohst.Put() accepts struct, or a slice of struct as an object or pointer to these kinds.")
 	}
 
-	return ds.container.Put(object, trx)
+	return ds.container.Put(trx, object)
 }
 
 // Delete objects
 func (ds *DataStore) Delete(object interface{}, params ...interface{}) error {
-	return ds.Delete__(object, params, Trx{})
+	return ds.Delete__(Trx{}, object, params...)
 }
 
 // Delete objects
-func (ds *DataStore) Delete__(object interface{}, params ...interface{}, trx Trx) error {
+func (ds *DataStore) Delete__(trx Trx, object interface{}, params ...interface{}) error {
 
 	// object should be on struct, pointer to struct, slice of struct or pointer to slice of struct
 	_kind := KindOf(object)
@@ -225,13 +225,13 @@ func (ds *DataStore) Delete__(object interface{}, params ...interface{}, trx Trx
 
 		// DeleteById
 		if reflect.TypeOf(options).String() == "[]int64" {
-			return ds.container.DeleteById(object, options.([]int64), trx)
+			return ds.container.DeleteById(trx, object, options.([]int64))
 		}
 
 		// Delete(request)
 		request, ok := options.(Requester)
 		if ok {
-			return ds.container.Delete(object, request, trx)
+			return ds.container.Delete(trx, object, request)
 		}
 	} else {
 		_value := reflect.ValueOf(object)
@@ -250,7 +250,7 @@ func (ds *DataStore) Delete__(object interface{}, params ...interface{}, trx Trx
 				ids = append(ids, _value.Index(i).FieldByName("Id").Interface().(int64))
 			}
 		}
-		return ds.container.DeleteById(object, ids, trx)
+		return ds.container.DeleteById(trx, object, ids)
 	}
 
 	return fmt.Errorf("gohst.Delete() has no proper request parameters to process.")
@@ -306,12 +306,16 @@ func (ds *DataStore) Prepare(name string, object interface{}, request Requester)
 }
 
 func (ds *DataStore) ExecutePrepared(name string, object interface{}, values ...interface{}) error {
+	return ds.ExecutePrepared__(Trx{}, name, object, values...)
+}
+
+func (ds *DataStore) ExecutePrepared__(trx Trx, name string, object interface{}, values ...interface{}) error {
 
 	if name == "" {
 		return fmt.Errorf("gohst.ExecutePrepared requires a name")
 	}
 
-	return ds.container.ExecutePrepared(name, object, values...)
+	return ds.container.ExecutePrepared(trx, name, object, values...)
 }
 
 func (ds *DataStore) Drop(object interface{}, confirmed bool) error {
