@@ -15,13 +15,13 @@ var tc = TColor
 
 func init() {
 	// Contactizer = gohst.PostJsonDataStore{"allochi_contactizer", "allochi", ""}
-	// Contactizer = gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	// Contactizer = gohst.NewPostJson("dbname=allochi_contactizer user=allochi sslmode=disable")
 	// Contactizer.Connect()
 	// Contactizer.CheckCollections = true
 	// gohst.Register("Contactizer", Contactizer)
 
 	// var Contactizer gohst.DataStore
-	ContactizerJson := gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	ContactizerJson := gohst.NewPostJson("dbname=allochi_contactizer user=allochi sslmode=disable")
 	Contactizer.Register("Contactizer", ContactizerJson)
 	Contactizer.Connect()
 	// Contactizer.Container.CheckCollections = true

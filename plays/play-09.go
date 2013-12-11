@@ -15,7 +15,7 @@ var Contactizer gohst.DataStore
 
 func init() {
 
-	DSPostJson := gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	DSPostJson := gohst.NewPostJson("dbname=allochi_contactizer user=allochi sslmode=disable")
 	DSPostJson.CheckCollections = true
 	DSPostJson.AutoCreateCollections = true
 

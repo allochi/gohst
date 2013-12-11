@@ -11,7 +11,7 @@ import (
 func init() {
 
 	var Contactizer gohst.DataStore
-	postgres := gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	postgres := gohst.NewPostJson("dbname=allochi_contactizer user=allochi sslmode=disable")
 	postgres.CheckCollections = true
 	postgres.AutoCreateCollections = true
 	gohst.Register("Contactizer", postgres)

@@ -18,9 +18,7 @@ var (
 )
 
 type PostJsonDataStore struct {
-	DatabaseName          string
-	User                  string
-	Password              string
+	connectionString      string
 	DB                    *sql.DB
 	CheckCollections      bool
 	AutoCreateCollections bool
@@ -43,11 +41,9 @@ type Trx struct {
 }
 
 // NewPostJson creates new store object only
-func NewPostJson(DatabaseName, User, Password string) *PostJsonDataStore {
+func NewPostJson(connectionString string) *PostJsonDataStore {
 	store := new(PostJsonDataStore)
-	store.DatabaseName = DatabaseName
-	store.User = User
-	store.Password = Password
+	store.connectionString = connectionString
 	store.CollectionNames = make(map[string]bool)
 	store.CollectionStmts = make(map[string]map[string]*sql.Stmt)
 	store.Transactions = make(map[string]Trx)
@@ -55,7 +51,7 @@ func NewPostJson(DatabaseName, User, Password string) *PostJsonDataStore {
 }
 
 func (ds *PostJsonDataStore) Connect() (err error) {
-	ds.DB, err = sql.Open("postgres", "user="+ds.User+" dbname="+ds.DatabaseName+" sslmode=disable")
+	ds.DB, err = sql.Open("postgres", ds.connectionString)
 	if err != nil {
 		return
 	}

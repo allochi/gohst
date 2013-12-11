@@ -9,7 +9,7 @@ import (
 
 func init() {
 
-	ContactizerJson := gohst.NewPostJson("allochi_contactizer", "allochi", "")
+	ContactizerJson := gohst.NewPostJson("dbname=allochi_contactizer user=allochi sslmode=disable")
 	ContactizerJson.CheckCollections = true
 	ContactizerJson.AutoCreateCollections = true
 	gohst.Register("Contactizer", ContactizerJson)
